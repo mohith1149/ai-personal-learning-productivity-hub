@@ -63,6 +63,8 @@ class Task(IdMixin, OwnedMixin, TimestampMixin, Base):
         CheckConstraint(in_values("task_type", TASK_TYPES), name="task_type"),
         CheckConstraint(in_values("status", TASK_STATUSES), name="status"),
         CheckConstraint("priority BETWEEN 1 AND 4", name="priority"),
+        # A task is 'completed' exactly when it has a completion time — the app can never store one without the other.
+        CheckConstraint("(status = 'completed') = (completed_at IS NOT NULL)", name="completed_consistency"),
         UniqueConstraint("recurring_task_id", "scheduled_date"),
         Index("ix_tasks_user_sched", "user_id", "scheduled_date"),
         Index("ix_tasks_user_status", "user_id", "status"),
