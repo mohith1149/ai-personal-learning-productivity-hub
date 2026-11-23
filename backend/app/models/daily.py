@@ -113,3 +113,13 @@ class AIPendingAction(IdMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(10), default="pending", nullable=False)
     result: Mapped[str | None] = mapped_column(Text)
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class AIMemory(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """Long-term assistant memory: short facts/preferences the user can inspect and delete."""
+
+    __tablename__ = "ai_memories"
+
+    kind: Mapped[str] = mapped_column(String(20), default="preference", nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String(16), default="user", nullable=False)  # user|assistant

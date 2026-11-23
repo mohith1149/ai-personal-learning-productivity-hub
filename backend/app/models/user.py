@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base, UTCDateTime
+from app.database import Base, UTCDateTime, utcnow
 from app.models.base import IdMixin, OwnedMixin, TimestampMixin
 
 
@@ -14,6 +14,8 @@ class User(IdMixin, TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", nullable=False)
+    # Bumped on logout / password change; tokens with an older version are rejected.
+    session_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     settings: Mapped["UserSettings"] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
@@ -63,3 +65,14 @@ class ActivityLog(IdMixin, OwnedMixin, TimestampMixin, Base):
     action: Mapped[str] = mapped_column(String(40), nullable=False)
     source: Mapped[str] = mapped_column(String(16), default="user", nullable=False)  # user|ai|system
     details: Mapped[str | None] = mapped_column(Text)  # JSON
+
+
+class LoginAttempt(IdMixin, Base):
+    """Failed-login log used for lockout. Stores the e-mail tried and client IP, never passwords."""
+
+    __tablename__ = "login_attempts"
+    __table_args__ = (Index("ix_login_attempts_email_time", "email", "attempted_at"),)
+
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(64))
+    attempted_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

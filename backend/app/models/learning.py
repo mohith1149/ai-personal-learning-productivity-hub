@@ -10,7 +10,8 @@ COURSE_KINDS = ("course", "video_series")
 COURSE_STATUSES = ("active", "paused", "completed", "archived")
 LESSON_TYPES = ("lesson", "video")
 LESSON_STATUSES = ("not_started", "in_progress", "completed")
-TOPIC_STATUSES = ("not_started", "learning", "completed")
+TOPIC_STATUSES = ("not_started", "in_progress", "completed")
+VIDEO_STATUSES = ("unwatched", "watching", "completed")
 
 
 class Course(IdMixin, OwnedMixin, TimestampMixin, Base):
@@ -25,6 +26,7 @@ class Course(IdMixin, OwnedMixin, TimestampMixin, Base):
     provider: Mapped[str | None] = mapped_column(String(100))
     url: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
     kind: Mapped[str] = mapped_column(String(16), default="course", nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
@@ -117,6 +119,8 @@ class RoadmapTopic(IdMixin, OwnedMixin, TimestampMixin, Base):
     exercises: Mapped[str | None] = mapped_column(Text)
     project_applications: Mapped[str | None] = mapped_column(Text)
     minutes_spent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    last_studied_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     stage: Mapped[RoadmapStage] = relationship(back_populates="topics")
@@ -151,4 +155,28 @@ class LearningSession(IdMixin, OwnedMixin, TimestampMixin, Base):
     roadmap_topic_id: Mapped[int | None] = mapped_column(
         ForeignKey("roadmap_topics.id", ondelete="SET NULL")
     )
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class Video(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """ByteByteGo (or any) video. Completion is recorded only by explicit user action."""
+
+    __tablename__ = "videos"
+    __table_args__ = (
+        CheckConstraint(in_values("status", VIDEO_STATUSES), name="status"),
+        # The next-video recommendation query is driven by this index.
+        Index("ix_videos_user_status_pos", "user_id", "status", "position"),
+        # completed <=> completed_at is set (keeps the history honest)
+        CheckConstraint(
+            "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"
+        ),
+    )
+
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    url: Mapped[str | None] = mapped_column(String(500))
+    description: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(12), default="unwatched", nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     notes: Mapped[str | None] = mapped_column(Text)

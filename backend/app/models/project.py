@@ -52,13 +52,18 @@ class Project(IdMixin, OwnedMixin, TimestampMixin, Base):
     __tablename__ = "projects"
     __table_args__ = (
         CheckConstraint(in_values("status", PROJECT_STATUSES), name="status"),
+        CheckConstraint("priority BETWEEN 1 AND 4", name="priority"),
         Index("ix_projects_user_status", "user_id", "status"),
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    objective: Mapped[str | None] = mapped_column(Text)
     problem_statement: Mapped[str | None] = mapped_column(Text)
     tech_stack: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    priority: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    target_date: Mapped[DateT | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     is_ai_project: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     idea_id: Mapped[int | None] = mapped_column(
@@ -155,6 +160,15 @@ class DailyChallenge(IdMixin, OwnedMixin, TimestampMixin, Base):
             name="completed_needs_evidence",
         ),
         CheckConstraint("status <> 'excused' OR excuse_reason IS NOT NULL", name="excused_needs_reason"),
+        # A completed day needs a recorded repository and commit hash.
+        CheckConstraint(
+            "status <> 'completed' OR (commit_sha IS NOT NULL AND repo_url IS NOT NULL)",
+            name="completed_needs_commit",
+        ),
+        CheckConstraint(
+            in_values("verification_status", ("unverified", "verified")),
+            name="verification_status",
+        ),
     )
 
     date: Mapped[DateT] = mapped_column(Date, nullable=False)
@@ -173,9 +187,37 @@ class DailyChallenge(IdMixin, OwnedMixin, TimestampMixin, Base):
     milestone_id: Mapped[int | None] = mapped_column(
         ForeignKey("project_milestones.id", ondelete="SET NULL")
     )
+    # Manual evidence. Marked 'unverified' until GitHub verification exists (Phase 4).
+    repo_url: Mapped[str | None] = mapped_column(String(500))
+    commit_sha: Mapped[str | None] = mapped_column(String(40))
+    commit_message: Mapped[str | None] = mapped_column(Text)
+    evidence_notes: Mapped[str | None] = mapped_column(Text)
+    verification_status: Mapped[str] = mapped_column(
+        String(12), default="unverified", nullable=False
+    )
     excuse_reason: Mapped[str | None] = mapped_column(Text)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     project: Mapped[Project | None] = relationship()
     commit: Mapped[GitCommit | None] = relationship()
     milestone: Mapped[ProjectMilestone | None] = relationship()
+
+
+class ProjectSession(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """A recorded development session on a project."""
+
+    __tablename__ = "project_sessions"
+    __table_args__ = (
+        CheckConstraint("minutes > 0", name="minutes_positive"),
+        Index("ix_project_sessions_project_date", "project_id", "date"),
+    )
+
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    date: Mapped[DateT] = mapped_column(Date, nullable=False)
+    minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    milestone_id: Mapped[int | None] = mapped_column(
+        ForeignKey("project_milestones.id", ondelete="SET NULL")
+    )

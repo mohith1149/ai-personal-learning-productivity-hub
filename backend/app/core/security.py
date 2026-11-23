@@ -22,21 +22,23 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, session_version: int = 0) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
+        "sv": session_version,
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_expire_minutes),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> int | None:
+def decode_access_token(token: str) -> tuple[int, int] | None:
+    """Returns (user_id, session_version) or None if the token is invalid/expired."""
     try:
         payload = jwt.decode(token, get_settings().secret_key, algorithms=[JWT_ALGORITHM])
-        return int(payload["sub"])
+        return int(payload["sub"]), int(payload["sv"])
     except (jwt.PyJWTError, KeyError, ValueError):
         return None
 

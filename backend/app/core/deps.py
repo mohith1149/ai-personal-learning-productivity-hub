@@ -18,9 +18,10 @@ def get_current_user(request: Request, db: DbSession) -> User:
     auth = request.headers.get("Authorization", "")
     if not token and auth.lower().startswith("bearer "):
         token = auth[7:]
-    user_id = decode_access_token(token) if token else None
-    user = db.get(User, user_id) if user_id else None
-    if user is None:
+    decoded = decode_access_token(token) if token else None
+    user = db.get(User, decoded[0]) if decoded else None
+    # A token is valid only while its session_version matches (logout bumps the version).
+    if user is None or decoded is None or decoded[1] != user.session_version:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     return user
 

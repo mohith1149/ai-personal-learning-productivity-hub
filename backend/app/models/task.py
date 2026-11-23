@@ -79,6 +79,7 @@ class Task(IdMixin, OwnedMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
     scheduled_date: Mapped[date | None] = mapped_column(Date)
     due_date: Mapped[date | None] = mapped_column(Date)
+    due_time: Mapped[str | None] = mapped_column(String(5))  # "HH:MM" local time
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
     actual_minutes: Mapped[int | None] = mapped_column(Integer)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

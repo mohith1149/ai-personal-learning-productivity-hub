@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-23 — Phases 1–2 complete. Next: Phase 3 (core application).
+Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestone 1 (auth) done.
 
 ---
 
@@ -169,6 +169,23 @@ All tables have `id` (int PK), `created_at`, `updated_at` (UTC) unless noted.
 | ai_pending_actions | conversation_id, tool_name, tool_input(JSON), status(pending/approved/rejected/executed/failed), result(JSON), resolved_at | |
 | activity_log | entity_type, entity_id, action, source(user/ai/system), details(JSON) | idx(user_id, created_at) — audit trail, preserves history |
 
+### 5a. Schema changes since Phase 1 (migration `3fe8e7449f3d`, Phase 3)
+
+| Change | Why |
+|---|---|
+| `tasks.due_time` | overdue logic needs a time of day |
+| `courses.notes`; `roadmap_topics.notes`, `.last_studied_at`; `roadmap_topics.status` now `not_started/in_progress/completed` | Phase 3 spec |
+| **new `videos`** (title, url, description, category, status `unwatched/watching/completed`, position, completed_at, notes) with CHECK `(status='completed') = (completed_at IS NOT NULL)` and index `(user_id,status,position)` | dedicated ByteByteGo tracker; **replaces** the Phase 1 idea of storing videos as course lessons |
+| `habits.start_date`, `.notes` | Phase 3 spec |
+| `projects.objective`, `.notes`, `.priority`, `.target_date`; CHECK priority 1–4 | Phase 3 spec |
+| **new `project_sessions`** (project, date, minutes>0, summary, milestone) | development-session tracking |
+| `daily_challenges.repo_url`, `.commit_sha`, `.commit_message`, `.evidence_notes`, `.verification_status` (`unverified`/`verified`, default `unverified`); CHECK `completed_needs_commit` | manual evidence now; GitHub verification in Phase 4. **A completed day requires summary + repo URL + commit hash** (stricter than the Phase 1 "milestone" alternative, per the Phase 3 spec) |
+| `users.session_version` | server-side session revocation |
+| **new `login_attempts`**, **new `ai_memories`** | login lockout; user-visible long-term assistant memory |
+
+Gotcha learned: Alembic autogenerate does **not** detect CHECK constraints on existing tables — they were added to the
+migration by hand and verified in the live DB. The migration was round-tripped (up/down/up) on a scratch database.
+
 ## 6. API endpoints (prefix `/api`)
 
 Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
@@ -176,7 +193,7 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Area | Endpoints | Status |
 |---|---|---|
 | Health | `GET /health` | ✅ |
-| Auth | `GET /auth/status`, `POST /auth/setup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | ⏳ |
+| Auth | `GET /auth/status`, `POST /auth/setup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | ✅ (tested + live) |
 | Settings | `GET/PATCH /settings` | ⏳ |
 | Dashboard | `GET /dashboard/today`, `GET /dashboard/overview` | ⏳ |
 | Categories | `GET/POST /categories`, `PATCH/DELETE /categories/{id}` | ⏳ |
@@ -226,7 +243,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth, dashboard, tasks, categories, recurring, courses, ByteByteGo, roadmap, habits, projects | ⏳ |
+| 3 | Auth ✅ · app shell · tasks · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 2 next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -246,6 +263,24 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   excused requires reason, one challenge per day, email idempotency key, UTC round-trip.
   Frontend typecheck + production build pass. Live check: health OK directly and via proxy.
 
+**Phase 3 — Milestone 1: authentication (done)**
+- Backend: `services/auth.py`, `routers/auth.py`, `schemas/auth.py`; middleware that rejects cross-origin writes (403);
+  `/docs` and `/openapi.json` only when `ENVIRONMENT` is development/test.
+- Rules: exactly one account. The first user is inserted with `id=1`, so a concurrent second setup collides on the
+  primary key even if it passes the application check. Setup later returns 409 and cannot overwrite anything.
+- Passwords: bcrypt; min 10 chars, must mix letters with digits/symbols, no edge whitespace. E-mail normalised to lower case.
+- Session: JWT in an **HttpOnly, SameSite=Lax** cookie (`Secure` via `COOKIE_SECURE`). The token embeds `session_version`;
+  logout bumps it, so every previously issued token dies server-side (not just client-side cookie deletion).
+- Login: wrong e-mail and wrong password return the same 401 and burn the same bcrypt time; 5 failures / 15 min per e-mail
+  → 429 + `Retry-After`; success clears the counter. Responses expose only `id, email, display_name, timezone`.
+- Frontend: `api/client.ts` (typed fetch, error mapping incl. 422 and 429), `api/auth.ts` (TanStack Query hooks),
+  `pages/AuthPages.tsx` (Setup + Login), `App.tsx` gates routes on server-reported auth state (setup → login → app).
+- Tests: 29/29 backend pass (23 new auth tests incl. race, lockout, revocation, CSRF, tamper). A mutation check
+  (disabling the version check) made the logout test fail, confirming the test is meaningful.
+- Live checks via the Vite proxy: setup → 201, second setup → 409, cookie HttpOnly, restart backend → session and
+  login still work, logout → old token 401, DB holds only a bcrypt hash.
+- Not yet verified: the setup/login screens in a real browser (no browser automation run yet) — see Known issues.
+
 ## 11. Pending work
 
 See phase table. Credentials needed later (asked only when that phase is reached):
@@ -256,4 +291,7 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
 
 - npm prints "new major version 12 available" — harmless; staying on npm 10 (matches Node 20).
 - Kaspersky HTTPS interception (see §2) — handled; if Kaspersky is uninstalled nothing breaks.
-- Git repo initialised; no commits yet (awaiting user go-ahead to commit).
+- Commits are authorised by the user after each tested milestone. Local git identity was unset; set repo-local
+  (`user.name`/`user.email`) from the account e-mail — change with `git config` if desired.
+- UI of the auth screens has been type-checked and built but not yet exercised in a real browser.
+- SQLite quirk: a running uvicorn holds `hub.db` open (WAL); stop it before deleting/replacing the file.

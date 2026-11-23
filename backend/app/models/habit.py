@@ -26,6 +26,8 @@ class Habit(IdMixin, OwnedMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    start_date: Mapped[DateT | None] = mapped_column(Date)
     frequency: Mapped[str] = mapped_column(String(10), default="daily", nullable=False)
     # daily: must be done every day; weekly: done on `target_per_period` days per week
     target_per_period: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
