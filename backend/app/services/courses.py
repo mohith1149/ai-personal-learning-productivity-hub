@@ -5,7 +5,8 @@ Rules implemented here:
     resolved through their course; someone else's id behaves exactly like "not found".
   * Lesson completion is ONLY ever caused by an explicit call (`complete_lesson`). Nothing marks a lesson done
     as a side effect, and templates never create completed lessons.
-  * A course's "completed" state is DERIVED: it is completed exactly when it has lessons and all are completed.
+  * A course's "completed" state is DERIVED: it is completed exactly when it has lessons, all are completed AND no
+    module is still empty (an empty module is content you have not entered yet, so "done" would be a guess).
     Un-completing a lesson (or adding a new one) reopens it. A course with no lessons may be completed by hand.
   * Progress percentage is floored so it only reads 100 when every lesson is really done.
   * `lesson.course_id` must always equal its module's course (checked on every create/move).
@@ -147,6 +148,7 @@ def progress(course: Course) -> dict:
         "total_lessons": total,
         "completed_lessons": done,
         "percent": (100 * done) // total if total else 0,
+        "empty_modules": sum(1 for m in course.modules if not m.lessons),
         "total_minutes": sum(lesson.duration_minutes or 0 for lesson in lessons),
         "remaining_minutes": sum(lesson.duration_minutes or 0 for lesson in lessons if lesson.status != "completed"),
     }
@@ -211,7 +213,11 @@ def _sync_course(course: Course, now: datetime | None = None) -> None:
     """Keep the course's status consistent with its lessons. Call after ANY change to lessons."""
     now = now or datetime.now(timezone.utc)
     lessons = _all_lessons(course)
-    all_done = bool(lessons) and all(lesson.status == "completed" for lesson in lessons)
+    all_done = (
+        bool(lessons)
+        and all(lesson.status == "completed" for lesson in lessons)
+        and all(m.lessons for m in course.modules)  # no module still waiting for its lessons
+    )
     if all_done and course.status in ("active", "paused"):
         course.status = "completed"
         course.completed_at = course.completed_at or now

@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell) and 3 (tasks) done.
+Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks) and 4 (courses) done.
 
 ---
 
@@ -194,6 +194,10 @@ All tables have `id` (int PK), `created_at`, `updated_at` (UTC) unless noted.
 `(status = 'completed') = (completed_at IS NOT NULL)`. Hand-written (see gotcha below), repairs any inconsistent rows first,
 round-tripped up/down/up, `alembic check` reports no drift.
 
+**Migration `b2d5f8c3a1e7` (Milestone 4):** CHECK `completed_at_matches_status` on `course_lessons`
+(`(status='completed') = (completed_at IS NOT NULL)`), hand-written, repairs inconsistent rows first, round-tripped up/down/up,
+`alembic check` clean.
+
 Gotcha learned: Alembic autogenerate does **not** detect CHECK constraints on existing tables — they were added to the
 migration by hand and verified in the live DB. The migration was round-tripped (up/down/up) on a scratch database.
 
@@ -210,9 +214,11 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Task categories | `GET/POST /task-categories`, `PATCH/DELETE /task-categories/{id}` | ✅ (tested + live) |
 | Tasks | `GET /tasks?view=all\|open\|today\|overdue\|upcoming\|completed&status&category_id&priority&q&limit&offset` → `{items,total}`, `GET /tasks/counts`, `POST /tasks`, `GET/PATCH/DELETE /tasks/{id}` (complete/reopen/cancel = `PATCH {status}`) | ✅ (tested + live) |
 | Recurring | `GET/POST /recurring-tasks`, `PATCH/DELETE /recurring-tasks/{id}` (generation is automatic and idempotent; no public generate endpoint yet) | ✅ (tested + live) |
-| Courses | `GET/POST /courses`, `GET/PATCH/DELETE /courses/{id}`, `POST /courses/{id}/pause`, `/resume`, `GET /courses/{id}/next`, `POST /courses/{id}/modules`, `POST /courses/{id}/bulk-lessons`, `PATCH/DELETE /modules/{id}`, `POST /modules/{id}/lessons`, `PATCH/DELETE /lessons/{id}`, `POST /lessons/{id}/complete`, `/uncomplete` | ⏳ |
+| Courses | `GET /courses?status=`, `POST /courses`, `GET/PATCH/DELETE /courses/{id}` (pause/resume/archive = `PATCH {status}`), `GET /courses/{id}/next`, `POST /courses/{id}/modules`, `POST /courses/{id}/bulk-lessons` | ✅ (tested + live) |
+| Modules / lessons | `PATCH/DELETE /modules/{id}`, `POST /modules/{id}/move`, `POST /modules/{id}/lessons`, `PATCH/DELETE /lessons/{id}`, `POST /lessons/{id}/move\|start\|complete\|uncomplete` (every one returns the whole updated course) | ✅ (tested + live) |
+| Course templates | `GET /course-templates`, `POST /course-templates/{key}` (409 if already added) | ✅ (tested + live) |
 | ByteByteGo | `GET /learning/bytebytego` (summary, next N videos, daily target) | ⏳ |
-| Learning sessions | `GET/POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ⏳ |
+| Learning sessions | `GET /learning-sessions?course_id&limit&offset`, `POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ✅ (tested + live) |
 | Roadmap | `GET /roadmap`, `POST /roadmap/topics`, `PATCH /roadmap/topics/{id}`, `GET /roadmap/next` | ⏳ |
 | Habits | `GET/POST /habits`, `PATCH/DELETE /habits/{id}`, `PUT /habits/{id}/logs/{date}`, `GET /habits/{id}/stats` | ⏳ |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, milestones `POST /projects/{id}/milestones`, `PATCH/DELETE /milestones/{id}` | ⏳ |
@@ -254,7 +260,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 4 (courses/lessons) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 5 (video playlists) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -349,6 +355,43 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   holds the owner's account. `frontend/vite.config.ts` accepts an `API_TARGET` env var (dev only) so a second dev server can
   point at a throwaway backend.
 
+**Phase 3 — Milestone 4: courses and lessons (done, branch `feat/courses`)**
+- Backend: `services/courses.py` (all rules), `routers/courses.py`, `schemas/courses.py`; shared strict schema base moved to
+  `schemas/common.py`. Modules and lessons have no `user_id`, so ownership is always resolved through their course and
+  someone else's id is "not found" (tested for every endpoint).
+- **Completion is explicit.** A lesson becomes completed only by `complete_lesson` (idempotent: the first completion time is kept);
+  a DB CHECK refuses completed without a completion time. Templates never create completed lessons.
+- **Course state is derived** from its lessons: it completes when it has lessons, every lesson is done **and no module is still
+  empty**; un-completing a lesson or adding one reopens it. Archived courses are never changed automatically. A course with no
+  lessons (e.g. a book) can be completed by hand; one with lessons cannot. **Bug found in my own design via the browser run:**
+  a course with 5 modules but lessons only in the first showed "Completed" after finishing that one module; fixed (empty modules
+  block completion, `progress.empty_modules` exposes the count, UI explains it).
+- Progress percent is **floored** (2 of 3 = 66, never 67) so 100 is only shown when every lesson is done. Next lesson = first
+  non-completed lesson in module-then-lesson order (an in-progress one counts).
+- Study sessions: no future dates, the lesson must belong to the course, time feeds `minutes_studied`; sessions survive deleting
+  their course (course_id becomes NULL) so studied time is never lost. `weekly_minutes()` is ready for the dashboard.
+- Links are only accepted as `http(s)://` because they become clickable (`javascript:`/`data:` rejected at the API and tested);
+  every external link opens with `rel="noreferrer noopener"`.
+- **Template `deeplearning-agentic-ai`:** only the five module titles are seeded, taken from
+  https://www.deeplearning.ai/courses/agentic-ai (checked 2026-11-23). **No lessons are invented** because the published sources
+  disagree on lesson-level details; the user pastes the lessons they actually take. The titles are editable. Added explicitly
+  by a button, never automatically; adding twice is refused (409).
+- Frontend (`pages/courses/`): list with status tabs (kept in `?status=`), progress bars, next lesson, minutes left, Quick-start
+  template card; detail page with progress, Up next (Start / Mark complete / Open), modules and lessons (tick, start, edit, move,
+  delete with confirmation), add module/lesson, **paste a list of lessons** (markers like `1.`, `-`, `•` are stripped, count
+  previewed), pause/resume/archive/restore, edit, delete, study-time log.
+- Tests: backend 203 (82 new in this milestone: 29 service-level, 53 HTTP-level). Frontend 89 (36 new). **Mutation checks: 16/16
+  backend and 14/14 UI deliberate bugs caught.**
+- **Real end-to-end run (19/19 checks)** in headless Edge against a real backend and throwaway DB, nothing stubbed: setup, empty
+  state + template, add template (5 modules, no lessons), paste lessons, complete/start/add-with-duration, study log, the
+  not-complete-while-modules-empty rule, module reorder, deleting empty modules completes the course, reopen, pause/resume/archive,
+  rejected `javascript:` link, delete lesson with confirmation, reload, sign-out/in, no console errors, no overflow at 390px. The
+  saved DB was inspected directly (no inconsistent lessons, no lesson attached to another course, session saved, no plaintext password).
+- Bugs found and fixed during the milestone: (1) `populate_existing` reloads overwrote unflushed changes (lost updates) — the loader now
+  flushes first; (2) a field named `date` shadowed the `date` type in a Pydantic model; (3) `Card` silently dropped `aria-label`
+  (TypeScript does not check hyphenated JSX attributes); (4) the Active tab said "No courses yet" when only a completed course existed.
+- Ops: the real `hub.db` was backed up (`backend/data/backups/`, git-ignored) before migrating.
+
 ## 11. Pending work
 
 **Requested by the owner (2026-11-23) — YouTube playlists with a daily watch target.** Folded into Milestone 5, which
@@ -378,6 +421,8 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
   is a checkpoint; branch and `main` are both pushed to GitHub. Never force-push.
 - The browser end-to-end script from Milestone 3 lives only in a scratch folder and relies on a locally installed Edge and
   jsdom's transitive `ws` package. Formalise it (e.g. Playwright) in the integration-testing step so it runs from the repo.
+- Courses: no drag-and-drop (reordering uses up/down buttons); there is no "mark module complete" shortcut (by design: only
+  lessons carry completion); the course search/filter beyond status tabs is not built.
 - Recurring-task edit UI is create/pause/delete only; editing an existing template's title/schedule through the UI is not
   built (the API supports it).
 - Tasks created in the Today tab get today's date pre-filled; other tabs start blank. Carry-forward of unfinished tasks to

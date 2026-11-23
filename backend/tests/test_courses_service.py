@@ -62,7 +62,7 @@ def course3(db, user):
 
 
 def test_progress_floors_the_percentage_and_handles_empty_courses(db, user, course3):
-    assert svc.progress(course3) == {"total_lessons": 3, "completed_lessons": 0, "percent": 0, "total_minutes": 30, "remaining_minutes": 30}
+    assert svc.progress(course3) == {"total_lessons": 3, "completed_lessons": 0, "percent": 0, "empty_modules": 0, "total_minutes": 30, "remaining_minutes": 30}
     ids = [le.id for le in lessons_of(course3)]
     c = svc.complete_lesson(db, user, ids[0], now=NOW)
     assert svc.progress(c)["percent"] == 33 and svc.progress(c)["remaining_minutes"] == 20
@@ -155,6 +155,40 @@ def test_course_completes_when_the_last_lesson_is_done_and_reopens_otherwise(db,
     assert c.status == "active" and c.completed_at is None  # reopened, history not faked
     c = svc.complete_lesson(db, user, ids[1], now=NOW + timedelta(days=1))
     assert c.status == "completed" and c.completed_at == NOW + timedelta(days=1)
+
+
+def test_a_course_is_not_complete_while_a_module_is_still_empty(db, user):
+    c = mk_course(db, user)
+    m1, m2 = mk_module(db, user, c, "One"), mk_module(db, user, c, "Two")
+    c = mk_lessons(db, user, c, m1, ["a", "b"])
+    for le in lessons_of(c):
+        c = svc.complete_lesson(db, user, le.id, now=NOW)
+    assert svc.progress(c)["percent"] == 100 and svc.progress(c)["empty_modules"] == 1
+    assert c.status == "active" and c.completed_at is None  # every ADDED lesson is done, but module "Two" has none yet
+
+    c = mk_lessons(db, user, c, m2, ["c"])  # filling the module poses a new unfinished lesson
+    assert c.status == "active" and svc.progress(c)["empty_modules"] == 0
+    c = svc.complete_lesson(db, user, lessons_of(c)[-1].id, now=NOW)
+    assert c.status == "completed"
+
+
+def test_removing_the_empty_module_lets_the_course_complete(db, user):
+    c = mk_course(db, user)
+    m1, m2 = mk_module(db, user, c, "One"), mk_module(db, user, c, "Two")
+    c = mk_lessons(db, user, c, m1, ["a"])
+    c = svc.complete_lesson(db, user, lessons_of(c)[0].id, now=NOW)
+    assert c.status == "active"
+    c = svc.delete_module(db, user, m2.id)
+    assert c.status == "completed"
+
+
+def test_the_seeded_template_cannot_be_completed_by_finishing_only_the_lessons_you_added(db, user):
+    c = svc.add_template(db, user, "deeplearning-agentic-ai")
+    c = mk_lessons(db, user, c, c.modules[0], ["Welcome", "What is agentic AI?"])
+    for le in lessons_of(c):
+        c = svc.complete_lesson(db, user, le.id, now=NOW)
+    assert svc.progress(c)["empty_modules"] == 4
+    assert c.status == "active" and c.completed_at is None  # four modules are still waiting for their lessons
 
 
 def test_adding_a_lesson_reopens_a_completed_course(db, user, course3):
@@ -318,7 +352,7 @@ def test_template_seeds_structure_only_with_nothing_completed(db, user):
     assert [m.title for m in c.modules] == listed[0]["modules"] and len(c.modules) == 5
     assert lessons_of(c) == []  # lessons are not invented
     assert c.status == "active" and c.completed_at is None and c.started_at is None
-    assert svc.progress(c) == {"total_lessons": 0, "completed_lessons": 0, "percent": 0, "total_minutes": 0, "remaining_minutes": 0}
+    assert svc.progress(c) == {"total_lessons": 0, "completed_lessons": 0, "percent": 0, "empty_modules": 5, "total_minutes": 0, "remaining_minutes": 0}
     assert svc.list_templates(db, user)[0]["already_added"] is True
 
 

@@ -251,13 +251,23 @@ def test_template_endpoints_seed_structure_only_and_refuse_duplicates(c):
     assert r.status_code == 201
     course = r.json()
     assert course["provider"] == "DeepLearning.AI" and len(course["modules"]) == 5
-    assert course["progress"] == {"total_lessons": 0, "completed_lessons": 0, "percent": 0, "total_minutes": 0, "remaining_minutes": 0}
+    assert course["progress"] == {"total_lessons": 0, "completed_lessons": 0, "percent": 0, "empty_modules": 5, "total_minutes": 0, "remaining_minutes": 0}
     assert course["status"] == "active" and course["completed_at"] is None and course["next_lesson"] is None
 
     assert c.post("/api/course-templates/deeplearning-agentic-ai").status_code == 409
     assert c.post("/api/course-templates/nope").status_code == 404
     assert c.get("/api/course-templates").json()[0]["already_added"] is True
     assert len(c.get("/api/courses").json()) == 1
+
+
+def test_template_course_stays_active_until_every_module_has_lessons_and_they_are_done(c):
+    course = c.post("/api/course-templates/deeplearning-agentic-ai").json()
+    first = course["modules"][0]["id"]
+    r = c.post(f"/api/courses/{course['id']}/bulk-lessons", json={"module_id": first, "titles": ["Welcome", "Intro"]}).json()
+    for le in r["modules"][0]["lessons"]:
+        r = c.post(f"/api/lessons/{le['id']}/complete").json()
+    assert r["progress"]["percent"] == 100 and r["progress"]["empty_modules"] == 4
+    assert r["status"] == "active" and r["completed_at"] is None
 
 
 def test_fixed_paths_are_not_swallowed_by_id_routes(c):

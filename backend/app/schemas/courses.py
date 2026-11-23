@@ -121,6 +121,7 @@ class Progress(BaseModel):
     total_lessons: int
     completed_lessons: int
     percent: int  # floor, so it only reads 100 when EVERY lesson is done
+    empty_modules: int  # modules with no lessons yet; while any exist the course cannot be completed
     total_minutes: int  # sum of known lesson durations
     remaining_minutes: int  # known durations of lessons not yet completed
 

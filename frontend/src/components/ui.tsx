@@ -46,9 +46,10 @@ export function Button({
 
 /* ---------- Layout blocks ---------- */
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({ className, children, "aria-label": ariaLabel }: { className?: string; children: ReactNode; "aria-label"?: string }) {
   return (
     <section
+      aria-label={ariaLabel}
       className={cx(
         "rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900",
         className,
@@ -156,5 +157,22 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
     >
       {children}
     </span>
+  );
+}
+
+/** Accessible progress bar. `percent` is already floored by the server so 100 means every lesson is done. */
+export function ProgressBar({ percent, label }: { percent: number; label: string }) {
+  const p = Math.max(0, Math.min(100, percent));
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={p}
+      className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+    >
+      <div className={cx("h-full rounded-full transition-all", p === 100 ? "bg-emerald-500" : "bg-brand-500")} style={{ width: `${p}%` }} />
+    </div>
   );
 }
