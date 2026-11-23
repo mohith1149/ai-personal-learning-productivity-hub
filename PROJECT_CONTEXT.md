@@ -351,6 +351,19 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 
 ## 11. Pending work
 
+**Requested by the owner (2026-11-23) — YouTube playlists with a daily watch target.** Folded into Milestone 5, which
+widens from "ByteByteGo videos" to **video playlists** (ByteByteGo becomes just one playlist). Design:
+- New `video_playlists` table (name, source URL, optional YouTube playlist id, `daily_target`, active) and
+  `videos.playlist_id` + `videos.youtube_video_id`. Reuses the existing rule: completed videos are never recommended again,
+  enforced in the query (`status != 'completed' ORDER BY position`).
+- Adding videos: (1) paste video links, one per line (works with no credentials); (2) paste a playlist link, which needs a
+  free YouTube Data API key (only requested when this is built; nothing is faked without it).
+- "Today's videos": the next N unwatched videos where N = the playlist's daily target, plus "watched X of N today"
+  (counted in the user's local day). In-app reminder on the dashboard and Videos page.
+- Reminder emails ("you planned N, watched X, Y left") need the Phase 5 email setup (Gmail/SMTP credentials); until then
+  reminders are in-app only. The reminder is sent only when the target is not yet met and never duplicates (idempotency key).
+
+
 See phase table. Credentials needed later (asked only when that phase is reached):
 Anthropic API key (Phase 6), Gmail App Password or OAuth client (Phase 5),
 GitHub OAuth App client ID/secret or PAT (Phase 4).

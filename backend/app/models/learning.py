@@ -67,6 +67,9 @@ class CourseLesson(IdMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(in_values("lesson_type", LESSON_TYPES), name="lesson_type"),
         CheckConstraint(in_values("status", LESSON_STATUSES), name="status"),
+        CheckConstraint(
+            "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"
+        ),
         Index("ix_lessons_course_status_pos", "course_id", "status", "position"),
     )
 
