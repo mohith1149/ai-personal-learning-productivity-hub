@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth) and 2 (app shell) done.
+Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell) and 3 (tasks) done.
 
 ---
 
@@ -130,12 +130,13 @@ ai-learning-hub/
   frontend/
     src/
       api/                  typed fetch client + per-domain hooks (TanStack Query)
-      components/           AppLayout (sidebar, mobile drawer, header), ThemeSwitcher, ui.tsx primitives
-      pages/                AuthPages, ShellPages (dashboard, settings, placeholder, 404) + one per feature
+      components/           AppLayout (sidebar, mobile drawer, header), ThemeSwitcher, ui.tsx primitives,
+                            Modal (+ConfirmDialog), forms.tsx (TextInput/TextArea/SelectInput/FormError)
+      pages/                AuthPages, ShellPages (dashboard, settings, placeholder, 404); pages/tasks/ (Milestone 3)
       nav.ts                single source of truth for sidebar + routes (status ready|soon per feature)
       theme.tsx             light/dark/system theme (class-based, persisted, no flash on load)
       test/                 Vitest setup + shell tests
-      lib/                  dates, formatting (later)
+      lib/dates.ts          timezone-safe date helpers (todayIn, addDays, describeDue …)
   n8n/                      exported workflow JSON for daily email / weekly report / missed-day job
 ```
 
@@ -189,6 +190,10 @@ All tables have `id` (int PK), `created_at`, `updated_at` (UTC) unless noted.
 | `users.session_version` | server-side session revocation |
 | **new `login_attempts`**, **new `ai_memories`** | login lockout; user-visible long-term assistant memory |
 
+**Migration `a1c4e7b92d10` (Milestone 3):** CHECK `completed_consistency` on `tasks`:
+`(status = 'completed') = (completed_at IS NOT NULL)`. Hand-written (see gotcha below), repairs any inconsistent rows first,
+round-tripped up/down/up, `alembic check` reports no drift.
+
 Gotcha learned: Alembic autogenerate does **not** detect CHECK constraints on existing tables — they were added to the
 migration by hand and verified in the live DB. The migration was round-tripped (up/down/up) on a scratch database.
 
@@ -202,9 +207,9 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Auth | `GET /auth/status`, `POST /auth/setup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | ✅ (tested + live) |
 | Settings | `GET/PATCH /settings` | ⏳ |
 | Dashboard | `GET /dashboard/today`, `GET /dashboard/overview` | ⏳ |
-| Categories | `GET/POST /categories`, `PATCH/DELETE /categories/{id}` | ⏳ |
-| Tasks | `GET /tasks?date&status&category_id`, `POST /tasks`, `GET/PATCH/DELETE /tasks/{id}`, `POST /tasks/{id}/complete`, `/reopen`, `/reschedule`, `POST /tasks/carry-forward` | ⏳ |
-| Recurring | `GET/POST /recurring-tasks`, `PATCH/DELETE /recurring-tasks/{id}`, `POST /recurring-tasks/generate?date` | ⏳ |
+| Task categories | `GET/POST /task-categories`, `PATCH/DELETE /task-categories/{id}` | ✅ (tested + live) |
+| Tasks | `GET /tasks?view=all\|open\|today\|overdue\|upcoming\|completed&status&category_id&priority&q&limit&offset` → `{items,total}`, `GET /tasks/counts`, `POST /tasks`, `GET/PATCH/DELETE /tasks/{id}` (complete/reopen/cancel = `PATCH {status}`) | ✅ (tested + live) |
+| Recurring | `GET/POST /recurring-tasks`, `PATCH/DELETE /recurring-tasks/{id}` (generation is automatic and idempotent; no public generate endpoint yet) | ✅ (tested + live) |
 | Courses | `GET/POST /courses`, `GET/PATCH/DELETE /courses/{id}`, `POST /courses/{id}/pause`, `/resume`, `GET /courses/{id}/next`, `POST /courses/{id}/modules`, `POST /courses/{id}/bulk-lessons`, `PATCH/DELETE /modules/{id}`, `POST /modules/{id}/lessons`, `PATCH/DELETE /lessons/{id}`, `POST /lessons/{id}/complete`, `/uncomplete` | ⏳ |
 | ByteByteGo | `GET /learning/bytebytego` (summary, next N videos, daily target) | ⏳ |
 | Learning sessions | `GET/POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ⏳ |
@@ -249,7 +254,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 3 (tasks) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 4 (courses/lessons) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -308,6 +313,42 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Dependencies: added dev-only Vitest 4.1.12, jsdom, Testing Library. Vitest 3.x was rejected (critical tinypool
   advisory); Vitest 5 needs Node 22 (we have 20). `npm audit` reports 0 vulnerabilities.
 
+**Phase 3 — Milestone 3: tasks (done, branch `feat/tasks`)**
+- Backend: `services/tasks.py` (all rules), `routers/tasks.py` (thin HTTP), `schemas/tasks.py` (strict validation:
+  unknown fields rejected, blank strings → null, priority 1–4, `HH:MM` times), `core/timeutil.py` (user-timezone "today").
+  Every query is scoped to the owner; another user's id behaves exactly like "not found".
+- **Overdue** is computed, never stored: an open task is overdue the day after its due date, or the minute after its due
+  time, **in the user's timezone**. One definition exists twice (Python `is_overdue`, SQL `overdue_clause`) and a test
+  proves they agree across 120 combinations and three clock readings. Scheduled-only (no due date) tasks are never overdue.
+- **Completion**: `_apply_status` is the only code that sets/clears `completed_at`; the DB CHECK refuses any other state.
+  Completing twice keeps the first completion time; reopening/cancelling clears it. Completed work is never "overdue".
+- **Views** (`open/today/overdue/upcoming/completed/all`), search (LIKE wildcards escaped), category/priority filters,
+  pagination, and `/tasks/counts` (incl. `completed_today` in the user's local day).
+- **Recurring** (daily / weekdays / weekly on chosen days / monthly): instances are created for today + 7 days, idempotently
+  (`unique(recurring_task_id, scheduled_date)`), lazily whenever tasks are listed. Day 31 falls on the last day of shorter
+  months. If the app was closed, missed days are **back-filled (max 31 days) and show as overdue — they never silently
+  vanish**. Pausing skips days (resuming does not back-fill the pause). Changing the schedule replaces only future,
+  untouched (pending) instances; started/completed/past/today's tasks are kept. Deleting a template keeps its tasks.
+  Deleting one generated task does not resurrect it. A recurring task must start today or later.
+- Frontend (`pages/tasks/`): tabs with live counts (Open/Today/Overdue/Upcoming/Completed/All/Recurring, tab kept in
+  `?view=`), debounced search, category and priority filters, create/edit modal (due time disabled until a due date),
+  tick-to-complete, confirm-before-delete, category manager (add/rename/recolour/delete), recurring panel (create, pause/resume,
+  delete). Overdue is shown with a red badge + "N days overdue"; completed/in-progress/cancelled have their own badges.
+- Tests: backend 121 (92 new: 41 service-level with an injected clock, 51 HTTP-level incl. auth on all 14 endpoints,
+  validation, isolation between users, logout locking the API). Frontend 53 (36 new). **Mutation checks: 6/6 backend and
+  9/9 frontend deliberate bugs were caught.**
+- **Real end-to-end run (24/24 checks):** headless Edge → Vite → FastAPI → throwaway SQLite, nothing stubbed: first-run
+  setup through the real form, categories, 3 tasks, overdue marking, counts, complete/reopen, edit, recurring create →
+  8 instances, pause, delete with confirm, reload keeps the session and data, sign-out/sign-in, wrong password, no console
+  errors, no horizontal overflow at 390px. The saved DB was then inspected directly (bcrypt hash only, no plaintext, no
+  inconsistent rows, no duplicate recurring instances). The run is a scratch script, **not yet part of the repo**.
+- Found and fixed along the way: filter controls stacked full-width because two Tailwind width classes conflicted
+  (screenshot review caught it; unit tests could not); the same-origin (CSRF) guard correctly returned 403 to my test
+  server on :5174 until `FRONTEND_URL` was set — i.e. the guard works.
+- Dev ops: the real `hub.db` was **backed up** (`backend/data/backups/`, git-ignored) before migrating it, because it now
+  holds the owner's account. `frontend/vite.config.ts` accepts an `API_TARGET` env var (dev only) so a second dev server can
+  point at a throwaway backend.
+
 ## 11. Pending work
 
 See phase table. Credentials needed later (asked only when that phase is reached):
@@ -322,7 +363,11 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
   (`user.name`/`user.email`) from the account e-mail — change with `git config` if desired.
 - Git workflow (user rule): one branch per milestone (`feat/...`), merged into `main` with `--no-ff` so each milestone
   is a checkpoint; branch and `main` are both pushed to GitHub. Never force-push.
-- No automated test drives the real backend through the browser yet (the browser check stubbed the auth endpoint);
-  a full UI ↔ API end-to-end pass is planned for the integration-testing step.
+- The browser end-to-end script from Milestone 3 lives only in a scratch folder and relies on a locally installed Edge and
+  jsdom's transitive `ws` package. Formalise it (e.g. Playwright) in the integration-testing step so it runs from the repo.
+- Recurring-task edit UI is create/pause/delete only; editing an existing template's title/schedule through the UI is not
+  built (the API supports it).
+- Tasks created in the Today tab get today's date pre-filled; other tabs start blank. Carry-forward of unfinished tasks to
+  the next day belongs to the planner milestone (columns `carried_from_date`, `carry_count` already exist).
 - Timezone default `Asia/Kolkata` was assumed (setup form pre-fills the browser's timezone); profile editing is not built.
 - SQLite quirk: a running uvicorn holds `hub.db` open (WAL); stop it before deleting/replacing the file.

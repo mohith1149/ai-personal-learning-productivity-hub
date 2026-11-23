@@ -60,9 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/tasks",
         label: "Tasks",
         icon: ListChecks,
-        status: "soon",
-        milestone: "Milestone 3",
-        blurb: "Create, edit, complete and schedule tasks, including recurring ones and overdue tracking.",
+        status: "ready",
       },
       {
         to: "/projects",
