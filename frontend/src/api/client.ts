@@ -26,6 +26,14 @@ function messageFromDetail(detail: FastApiDetail, fallback: string): string {
   return fallback;
 }
 
+/** Build "?a=1&b=2", skipping empty values. */
+export function qs(params: Record<string, string | number | undefined | null>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") sp.set(k, String(v));
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
 export async function api<T = unknown>(
   path: string,
   options: { method?: string; body?: unknown } = {},

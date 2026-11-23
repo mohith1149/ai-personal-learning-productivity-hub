@@ -126,7 +126,7 @@ export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () =
  * The brief requires completed / pending / overdue / excused to be visually distinct everywhere.
  * One mapping here keeps every page consistent. */
 
-export type Status = "completed" | "pending" | "in_progress" | "overdue" | "excused" | "not_started" | "skipped";
+export type Status = "completed" | "pending" | "in_progress" | "overdue" | "excused" | "not_started" | "skipped" | "cancelled";
 
 const STATUS_STYLES: Record<Status, { label: string; cls: string }> = {
   completed: { label: "Completed", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" },
@@ -136,6 +136,7 @@ const STATUS_STYLES: Record<Status, { label: string; cls: string }> = {
   excused: { label: "Excused", cls: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300" },
   not_started: { label: "Not started", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
   skipped: { label: "Skipped", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
+  cancelled: { label: "Cancelled", cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" },
 };
 
 export function StatusBadge({ status }: { status: Status }) {
