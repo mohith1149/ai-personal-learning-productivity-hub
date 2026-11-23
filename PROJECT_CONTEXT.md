@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestone 1 (auth) done.
+Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth) and 2 (app shell) done.
 
 ---
 
@@ -47,8 +47,11 @@ npm run dev                                          # http://localhost:5173 (pr
 
 # Tests
 cd ai-learning-hub\backend; .venv\Scripts\python.exe -m pytest -q
-cd ai-learning-hub\frontend; npm run typecheck
+cd ai-learning-hub\frontend; npm run typecheck; npm test      # Vitest + Testing Library (jsdom)
 ```
+
+> **Windows gotcha:** run `npm test` from a path whose drive letter is **uppercase** (`D:\...`). From Git Bash's
+> `/d/...` (lower-case `d:`) Vitest loads two copies of itself and fails with "failed to find the current suite".
 
 `backend/.env` was generated locally with random `SECRET_KEY`, `ENCRYPTION_KEY`,
 `AUTOMATION_API_KEY` (git-ignored). Template: `backend/.env.example`.
@@ -127,9 +130,12 @@ ai-learning-hub/
   frontend/
     src/
       api/                  typed fetch client + per-domain hooks (TanStack Query)
-      components/           layout (Sidebar, Header), ui primitives, charts
-      pages/                one per sidebar item
-      lib/                  dates, formatting
+      components/           AppLayout (sidebar, mobile drawer, header), ThemeSwitcher, ui.tsx primitives
+      pages/                AuthPages, ShellPages (dashboard, settings, placeholder, 404) + one per feature
+      nav.ts                single source of truth for sidebar + routes (status ready|soon per feature)
+      theme.tsx             light/dark/system theme (class-based, persisted, no flash on load)
+      test/                 Vitest setup + shell tests
+      lib/                  dates, formatting (later)
   n8n/                      exported workflow JSON for daily email / weekly report / missed-day job
 ```
 
@@ -243,7 +249,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell · tasks · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 2 next |
+| 3 | Auth ✅ · app shell ✅ · tasks · courses · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 3 (tasks) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -279,7 +285,28 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   (disabling the version check) made the logout test fail, confirming the test is meaningful.
 - Live checks via the Vite proxy: setup → 201, second setup → 409, cookie HttpOnly, restart backend → session and
   login still work, logout → old token 401, DB holds only a bcrypt hash.
-- Not yet verified: the setup/login screens in a real browser (no browser automation run yet) — see Known issues.
+
+**Phase 3 — Milestone 2: application shell and design system (done, branch `feat/app-shell`)**
+- Layout: fixed sidebar on desktop (≥1024px), slide-in drawer on mobile (Escape / backdrop / close button / choosing a
+  page all close it; page scroll is locked while open), header with theme switcher, user chip and sign-out, skip-to-content link.
+- Navigation: `nav.ts` drives both the sidebar and the routes. Unbuilt features are marked **Soon** and render an honest
+  "Not built yet · Planned: Milestone N" page, never fake data. Each milestone flips its item to `ready`.
+- Theme: Light / Dark / System, class-based (`dark` on `<html>`), saved in `localStorage` (`hub-theme`, wrapped in
+  try/catch), applied by an inline script in `index.html` before first paint, follows the OS live while on System.
+- Shared primitives (`components/ui.tsx`): Button, Card, PageHeader, EmptyState, Spinner, ErrorNotice, Badge and a
+  `StatusBadge` giving completed / pending / in-progress / overdue / excused / not-started / skipped distinct colours.
+- Pages: Dashboard (greeting in the user's timezone + empty state, **no numbers until Milestone 11 computes real ones**),
+  Settings (real account details + theme), placeholder, 404. Signed-in visits to /login or /setup go to the dashboard.
+- **Bug found by the new tests and fixed:** `useLogout` called `queryClient.clear()`, which also deleted the auth query,
+  so nothing refetched and the UI stayed on the signed-in screen after sign-out. It now removes every query except auth
+  and refetches auth. (Backend revocation was already correct; this was a front-end-only fault.)
+- Tests: 17 Vitest tests (auth gating, nav list + Soon flags + active link, placeholder, 404, dashboard shows no digits,
+  settings, theme switch/persist/restore/system-follow/corrupt value, drawer behaviours, sign-out). Backend 29/29 still pass.
+- Browser verification: headless Edge driven over CDP against the real dev server (only `/api/auth/status` stubbed).
+  Screenshots checked for desktop light/dark, mobile light, mobile drawer dark, settings, setup, login dark; no
+  horizontal overflow at 390px; `dark` class applied. This was a visual check, not a full interactive end-to-end run.
+- Dependencies: added dev-only Vitest 4.1.12, jsdom, Testing Library. Vitest 3.x was rejected (critical tinypool
+  advisory); Vitest 5 needs Node 22 (we have 20). `npm audit` reports 0 vulnerabilities.
 
 ## 11. Pending work
 
@@ -293,5 +320,9 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
 - Kaspersky HTTPS interception (see §2) — handled; if Kaspersky is uninstalled nothing breaks.
 - Commits are authorised by the user after each tested milestone. Local git identity was unset; set repo-local
   (`user.name`/`user.email`) from the account e-mail — change with `git config` if desired.
-- UI of the auth screens has been type-checked and built but not yet exercised in a real browser.
+- Git workflow (user rule): one branch per milestone (`feat/...`), merged into `main` with `--no-ff` so each milestone
+  is a checkpoint; branch and `main` are both pushed to GitHub. Never force-push.
+- No automated test drives the real backend through the browser yet (the browser check stubbed the auth endpoint);
+  a full UI ↔ API end-to-end pass is planned for the integration-testing step.
+- Timezone default `Asia/Kolkata` was assumed (setup form pre-fills the browser's timezone); profile editing is not built.
 - SQLite quirk: a running uvicorn holds `hub.db` open (WAL); stop it before deleting/replacing the file.

@@ -1,26 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuthStatus, useLogout } from "./api/auth";
+import { useAuthStatus } from "./api/auth";
+import { AppLayout } from "./components/AppLayout";
+import { NAV_GROUPS } from "./nav";
 import { LoginPage, SetupPage } from "./pages/AuthPages";
+import { ComingSoonPage, DashboardPage, NotFoundPage, SettingsPage } from "./pages/ShellPages";
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-full items-center justify-center p-8 text-slate-500">{children}</div>;
-}
-
-/** Temporary signed-in landing page; replaced by the real app shell in the next milestone. */
-function Home() {
-  const { data } = useAuthStatus();
-  const logout = useLogout();
   return (
-    <main className="mx-auto max-w-xl p-8">
-      <h1 className="text-2xl font-semibold">Hello, {data?.user?.display_name}</h1>
-      <p className="mt-2 text-slate-500">You are signed in. The application shell arrives next.</p>
-      <button
-        onClick={() => logout.mutate()}
-        className="mt-6 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-      >
-        Sign out
-      </button>
-    </main>
+    <div className="flex min-h-full items-center justify-center p-8 text-slate-500 dark:text-slate-400">{children}</div>
   );
 }
 
@@ -60,8 +47,20 @@ export default function App() {
     );
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route element={<AppLayout />}>
+        <Route index element={<DashboardPage />} />
+        {/* Features not built yet render an honest placeholder; each milestone replaces its route below. */}
+        {NAV_GROUPS.flatMap((g) => g.items)
+          .filter((i) => i.status === "soon")
+          .map((i) => (
+            <Route key={i.to} path={i.to} element={<ComingSoonPage />} />
+          ))}
+        <Route path="settings" element={<SettingsPage />} />
+        {/* Signed-in users who visit /login or /setup land on the dashboard. */}
+        <Route path="login" element={<Navigate to="/" replace />} />
+        <Route path="setup" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
     </Routes>
   );
 }

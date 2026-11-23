@@ -4,16 +4,16 @@ import { useLogin, useSetup } from "../api/auth";
 
 function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-slate-50 to-brand-50 px-4 py-10">
+    <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-slate-50 to-brand-50 px-4 dark:from-slate-950 dark:to-slate-900 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-lg shadow-brand-600/30">
             AI
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">{children}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">{children}</div>
       </div>
     </div>
   );
@@ -30,16 +30,16 @@ function Field(props: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{props.label}</span>
+      <span className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">{props.label}</span>
       <input
         type={props.type ?? "text"}
         value={props.value}
         required={props.required ?? true}
         autoComplete={props.autoComplete}
         onChange={(e) => props.onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
-      {props.hint && <span className="mt-1 block text-xs text-slate-500">{props.hint}</span>}
+      {props.hint && <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{props.hint}</span>}
     </label>
   );
 }
@@ -49,7 +49,7 @@ function ErrorBox({ error }: { error: unknown }) {
   const e = error as ApiError;
   const lockout = e.status === 429 && e.retryAfter;
   return (
-    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
       {e.message}
       {lockout ? ` (about ${Math.ceil(e.retryAfter! / 60)} min)` : ""}
     </div>

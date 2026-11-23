@@ -38,8 +38,10 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api<void>("/auth/logout", { method: "POST" }),
     onSettled: () => {
-      // Drop every cached query so no data from the old session stays in memory.
-      qc.clear();
+      // Drop every cached query EXCEPT the auth status, so no data from the old session stays in memory.
+      // (qc.clear() would also delete the auth query itself, leaving nothing to refetch, so the UI would
+      // keep showing the signed-in screen after sign-out.)
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== AUTH_KEY[0] });
       qc.invalidateQueries({ queryKey: AUTH_KEY });
     },
   });
