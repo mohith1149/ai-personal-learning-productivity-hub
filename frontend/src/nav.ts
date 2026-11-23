@@ -87,9 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/courses",
         label: "Courses",
         icon: GraduationCap,
-        status: "soon",
-        milestone: "Milestone 4",
-        blurb: "Courses, modules and lessons, starting with DeepLearning.AI's Agentic AI course.",
+        status: "ready",
       },
       {
         to: "/videos",

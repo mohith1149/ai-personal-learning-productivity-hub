@@ -9,7 +9,12 @@ export const TODAY = todayIn(USER.timezone);
 
 export type Call = { method: string; path: string; query: Record<string, string>; body?: Record<string, unknown> };
 
+export type Req = { method: string; path: string; query: Record<string, string>; body?: Record<string, unknown> };
+/** Extra route handlers (e.g. the courses fake) are consulted before an unknown request is treated as a test failure. */
+export type Handler = (req: Req) => Response | undefined;
+
 export type Fake = {
+  handlers: Handler[];
   tasks: Task[];
   categories: Category[];
   recurring: Recurring[];
@@ -83,6 +88,7 @@ export function installFakeApi(seed: { tasks?: Task[]; categories?: Category[]; 
     categories: seed.categories ?? [],
     recurring: seed.recurring ?? [],
     calls: [],
+    handlers: [],
     failNext: () => {},
     callsTo: (method, re) => f.calls.filter((c) => c.method === method && re.test(c.path)),
   };
@@ -191,6 +197,10 @@ export function installFakeApi(seed: { tasks?: Task[]; categories?: Category[]; 
         }
       }
 
+      for (const h of f.handlers) {
+        const res = h({ method, path, query: Object.fromEntries(url.searchParams), body });
+        if (res) return res;
+      }
       throw new Error(`Unexpected request in test: ${key}`);
     }),
   );

@@ -8,23 +8,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.common import Strict as _Strict
+
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
 COLOR = r"^#[0-9a-fA-F]{6}$"
 
 Priority = Annotated[int, Field(ge=1, le=4, description="1=urgent, 2=high, 3=normal, 4=low")]
 Minutes = Annotated[int, Field(ge=1, le=1440)]
 ShortText = Annotated[str, Field(max_length=5000)]
-
-
-class _Strict(BaseModel):
-    # Unknown fields are rejected (typos fail loudly instead of being silently ignored).
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _blank_to_none(cls, v):
-        # An empty text box from the UI means "no value", not an empty string in the DB.
-        return None if isinstance(v, str) and v.strip() == "" else v
 
 
 # ---------- categories ----------
