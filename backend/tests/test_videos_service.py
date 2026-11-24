@@ -3,9 +3,10 @@ Test user lives in Asia/Kolkata (UTC+05:30)."""
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.models import User, Video, VideoPlaylist
+from app.models import User, Video, VideoMembership, VideoPlaylist
 from app.schemas import videos as s
 from app.services import auth as auth_service
 from app.services import videos as svc
@@ -30,7 +31,13 @@ def other_user(db, user) -> User:
 
 
 def mk_playlist(db, user, name="ByteByteGo", **kw) -> VideoPlaylist:
+    kw.setdefault("recommend_order", "manual")  # most tests care about insertion order; date ordering has its own tests
     return svc.create_playlist(db, user, s.PlaylistCreate(name=name, **kw))
+
+
+def positions(db, playlist) -> list[int]:
+    return list(db.scalars(select(VideoMembership.position).where(VideoMembership.playlist_id == playlist.id)
+                           .order_by(VideoMembership.position, VideoMembership.id)))
 
 
 def mk_videos(db, user, playlist, n=3) -> list[Video]:
@@ -119,11 +126,12 @@ def test_update_playlist_rejects_null_required_fields(db, user):
             svc.update_playlist(db, user, p.id, s.PlaylistUpdate(**{field: None}))
 
 
-def test_delete_playlist_removes_its_videos(db, user):
+def test_delete_playlist_keeps_its_videos_in_the_library(db, user):
     p = mk_playlist(db, user)
     mk_videos(db, user, p, 2)
     svc.delete_playlist(db, user, p.id)
-    assert db.query(Video).count() == 0 and db.query(VideoPlaylist).count() == 0
+    assert db.query(VideoPlaylist).count() == 0 and db.query(VideoMembership).count() == 0
+    assert db.query(Video).count() == 2  # still in the library, just in no collection
 
 
 def test_playlist_source_url_must_be_http(db):
@@ -138,7 +146,7 @@ def test_playlist_source_url_must_be_http(db):
 def test_videos_are_appended_in_order_and_start_unwatched(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
-    assert [v.position for v in (a, b, c)] == [1, 2, 3]
+    assert positions(db, p) == [1, 2, 3]
     assert all(v.status == "unwatched" and v.completed_at is None for v in (a, b, c))
 
 
@@ -208,11 +216,11 @@ def test_bulk_add_reports_added_duplicates_and_invalid(db, user):
         "Plain page | https://example.com/v/1",
     ]
     r = svc.bulk_add_videos(db, user, p.id, s.BulkVideos(lines=lines, category="Systems"))
-    assert (r["added"], r["duplicates"]) == (3, 2)
+    assert (r["added"], r["linked"], r["duplicates"]) == (3, 0, 2)
     assert r["invalid"] == ["no link here", "javascript:alert(1)"]
     items = svc.list_videos(db, user, p.id)["items"]
     assert [v.title for v in items] == ["Existing", "How DNS works", "YouTube video bbbbbbbbbbb", "Plain page"]
-    assert [v.position for v in items] == [1, 2, 3, 4]
+    assert positions(db, p) == [1, 2, 3, 4]
     assert items[1].category == "Systems"
 
 
@@ -279,7 +287,7 @@ def test_completed_video_is_never_recommended(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
     svc.complete_video(db, user, a.id, now=NOW)
-    assert [v.id for v in svc.next_videos(db, p.id, 10)] == [b.id, c.id]
+    assert [v.id for v in svc.next_videos(db, p, 10)] == [b.id, c.id]
     assert svc.playlist_summary(db, user, p.id, NOW)["next_video"].id == b.id
     assert svc.next_video_overall(db, user).id == b.id
 
@@ -288,21 +296,21 @@ def test_completing_out_of_order_skips_only_that_video(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
     svc.complete_video(db, user, b.id, now=NOW)
-    assert [v.id for v in svc.next_videos(db, p.id, 10)] == [a.id, c.id]
+    assert [v.id for v in svc.next_videos(db, p, 10)] == [a.id, c.id]
 
 
 def test_watching_video_is_still_recommended(db, user):
     p = mk_playlist(db, user)
     a, b, _ = mk_videos(db, user, p)
     svc.start_video(db, user, a.id)
-    assert svc.next_videos(db, p.id, 1)[0].id == a.id
+    assert svc.next_videos(db, p, 1)[0].id == a.id
 
 
 def test_nothing_recommended_when_everything_is_completed(db, user):
     p = mk_playlist(db, user)
     for v in mk_videos(db, user, p, 2):
         svc.complete_video(db, user, v.id, now=NOW)
-    assert svc.next_videos(db, p.id, 5) == [] and svc.next_video_overall(db, user) is None
+    assert svc.next_videos(db, p, 5) == [] and svc.next_video_overall(db, user) is None
     summary = svc.playlist_summary(db, user, p.id, NOW)
     assert summary["next_video"] is None and summary["percent"] == 100
 
@@ -311,17 +319,17 @@ def test_reopened_video_can_be_recommended_again_only_after_explicit_reopen(db, 
     p = mk_playlist(db, user)
     a, b, _ = mk_videos(db, user, p)
     svc.complete_video(db, user, a.id, now=NOW)
-    assert svc.next_videos(db, p.id, 1)[0].id == b.id
+    assert svc.next_videos(db, p, 1)[0].id == b.id
     svc.uncomplete_video(db, user, a.id)
-    assert svc.next_videos(db, p.id, 1)[0].id == a.id
+    assert svc.next_videos(db, p, 1)[0].id == a.id
 
 
 def test_recommendation_survives_reordering(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
     svc.complete_video(db, user, a.id, now=NOW)
-    svc.move_video(db, user, c.id, "up")  # order is now a, c, b
-    assert [v.id for v in svc.next_videos(db, p.id, 10)] == [c.id, b.id]
+    svc.move_video(db, user, c.id, "up", p.id)  # order is now a, c, b
+    assert [v.id for v in svc.next_videos(db, p, 10)] == [c.id, b.id]
 
 
 def test_overall_next_skips_inactive_playlists_and_other_users(db, user, other_user):
@@ -417,25 +425,25 @@ def test_move_up_down_and_edges(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
     order = lambda: [v.title for v in svc.list_videos(db, user, p.id)["items"]]  # noqa: E731
-    svc.move_video(db, user, c.id, "up")
+    svc.move_video(db, user, c.id, "up", p.id)
     assert order() == ["V1", "V3", "V2"]
-    svc.move_video(db, user, a.id, "up")      # already first: no change
-    svc.move_video(db, user, b.id, "down")    # already last: no change
+    svc.move_video(db, user, a.id, "up", p.id)      # already first: no change
+    svc.move_video(db, user, b.id, "down", p.id)    # already last: no change
     assert order() == ["V1", "V3", "V2"]
-    svc.move_video(db, user, a.id, "down")
+    svc.move_video(db, user, a.id, "down", p.id)
     assert order() == ["V3", "V1", "V2"]
 
 
 def test_move_works_even_when_positions_have_gaps_or_ties(db, user):
     p = mk_playlist(db, user)
     a, b, c = mk_videos(db, user, p)
-    a.position, b.position, c.position = 5, 5, 9
+    for v, pos in zip((a, b, c), (5, 5, 9)):
+        db.query(VideoMembership).filter_by(playlist_id=p.id, video_id=v.id).one().position = pos
     db.commit()
-    svc.move_video(db, user, b.id, "down")
+    svc.move_video(db, user, b.id, "down", p.id)
     # ties break by id, so the order was a, b, c; moving b down gives a, c, b
     assert [v.id for v in svc.list_videos(db, user, p.id)["items"]] == [a.id, c.id, b.id]
-    positions = [v.position for v in svc.list_videos(db, user, p.id)["items"]]
-    assert positions == [1, 2, 3]
+    assert positions(db, p) == [1, 2, 3]
 
 
 # ============================== isolation between users ==============================
@@ -457,7 +465,7 @@ def test_other_users_data_is_not_found(db, user, other_user):
         lambda: svc.start_video(db, other_user, v.id),
         lambda: svc.complete_video(db, other_user, v.id),
         lambda: svc.uncomplete_video(db, other_user, v.id),
-        lambda: svc.move_video(db, other_user, v.id, "up"),
+        lambda: svc.move_video(db, other_user, v.id, "up", p.id),
     ):
         with pytest.raises(svc.NotFound):
             call()

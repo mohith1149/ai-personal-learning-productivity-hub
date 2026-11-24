@@ -12,6 +12,8 @@ LESSON_TYPES = ("lesson", "video")
 LESSON_STATUSES = ("not_started", "in_progress", "completed")
 TOPIC_STATUSES = ("not_started", "in_progress", "completed")
 VIDEO_STATUSES = ("unwatched", "watching", "completed")
+PLAYLIST_KINDS = ("collection", "playlist", "channel")
+RECOMMEND_ORDERS = ("oldest", "newest", "manual")
 
 
 class Course(IdMixin, OwnedMixin, TimestampMixin, Base):
@@ -162,11 +164,17 @@ class LearningSession(IdMixin, OwnedMixin, TimestampMixin, Base):
 
 
 class VideoPlaylist(IdMixin, OwnedMixin, TimestampMixin, Base):
-    """A named list of videos (e.g. "ByteByteGo") with a daily watch target."""
+    """A collection of library videos with a daily watch target.
+
+    kind: "collection" (hand-made), "playlist" (imported from a YouTube playlist) or "channel" (imported from a channel).
+    Which videos belong to it is stored in `video_memberships`, so one video can sit in several collections.
+    """
 
     __tablename__ = "video_playlists"
     __table_args__ = (
         CheckConstraint("daily_target BETWEEN 1 AND 50", name="daily_target"),
+        CheckConstraint(in_values("kind", PLAYLIST_KINDS), name="kind"),
+        CheckConstraint(in_values("recommend_order", RECOMMEND_ORDERS), name="recommend_order"),
         UniqueConstraint("user_id", "name", name="uq_video_playlists_user_name"),
     )
 
@@ -176,40 +184,74 @@ class VideoPlaylist(IdMixin, OwnedMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     daily_target: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), default="collection", nullable=False)
+    youtube_channel_id: Mapped[str | None] = mapped_column(String(64))
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500))
+    # What YouTube reported the last time we looked. NULL = YouTube did not say; never estimated.
+    reported_total: Mapped[int | None] = mapped_column(Integer)
+    # How many videos the last fetch actually retrieved (may be fewer than reported_total).
+    retrieved_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # "oldest" / "newest" published first, or "manual" (the order set by hand).
+    recommend_order: Mapped[str] = mapped_column(String(8), default="oldest", nullable=False)
 
-    videos: Mapped[list["Video"]] = relationship(
-        back_populates="playlist", cascade="all, delete-orphan", order_by="Video.position"
+    memberships: Mapped[list["VideoMembership"]] = relationship(
+        back_populates="playlist", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
 class Video(IdMixin, OwnedMixin, TimestampMixin, Base):
-    """A video in a playlist. Completion is recorded only by explicit user action."""
+    """One video in the user's library. A YouTube video exists ONCE per user; collections only reference it.
+
+    Completion is recorded only by explicit user action. `removed_at` hides the video from the library and from
+    recommendations without deleting it (so notes and history survive a restore).
+    """
 
     __tablename__ = "videos"
     __table_args__ = (
         CheckConstraint(in_values("status", VIDEO_STATUSES), name="status"),
-        # The next-video recommendation query is driven by this index.
-        Index("ix_videos_user_status_pos", "user_id", "status", "position"),
-        Index("ix_videos_playlist_status_pos", "playlist_id", "status", "position"),
         # completed <=> completed_at is set (keeps the history honest)
         CheckConstraint(
             "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"
         ),
-        # The same YouTube video cannot be added twice to one playlist (NULL ids are exempt).
-        UniqueConstraint("playlist_id", "youtube_video_id", name="uq_videos_playlist_youtube"),
+        # Library-wide de-duplication (NULL ids - videos added by hand without a YouTube link - are exempt).
+        UniqueConstraint("user_id", "youtube_video_id", name="uq_videos_user_youtube"),
+        # The recommendation query is driven by this index.
+        Index("ix_videos_user_status_published", "user_id", "status", "published_at"),
     )
 
-    playlist_id: Mapped[int] = mapped_column(
-        ForeignKey("video_playlists.id", ondelete="CASCADE"), nullable=False
-    )
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     url: Mapped[str | None] = mapped_column(String(500))
     youtube_video_id: Mapped[str | None] = mapped_column(String(20))
     description: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(12), default="unwatched", nullable=False)
-    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     notes: Mapped[str | None] = mapped_column(Text)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500))
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    channel_id: Mapped[str | None] = mapped_column(String(64))
+    channel_title: Mapped[str | None] = mapped_column(String(200))
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
-    playlist: Mapped[VideoPlaylist] = relationship(back_populates="videos")
+    memberships: Mapped[list["VideoMembership"]] = relationship(
+        back_populates="video", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @property
+    def playlist_ids(self) -> list[int]:
+        return sorted(m.playlist_id for m in self.memberships)
+
+
+class VideoMembership(IdMixin, Base):
+    """Links a library video to a collection (and holds its manual position there)."""
+
+    __tablename__ = "video_memberships"
+    __table_args__ = (UniqueConstraint("playlist_id", "video_id", name="uq_video_memberships_playlist_video"),)
+
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("video_playlists.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    playlist: Mapped[VideoPlaylist] = relationship(back_populates="memberships")
+    video: Mapped[Video] = relationship(back_populates="memberships")

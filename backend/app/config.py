@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     github_client_secret: str | None = None
 
     # Anthropic
+    youtube_api_key: str | None = None  # YouTube Data API v3 key; backend only, never sent to the browser
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5-5"
 
