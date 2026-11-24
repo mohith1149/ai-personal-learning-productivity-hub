@@ -1,40 +1,9 @@
-import { Compass, Hammer } from "lucide-react";
+import { Hammer } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuthStatus } from "../api/auth";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { Button, Card, EmptyState, PageHeader } from "../components/ui";
 import { ALL_NAV_ITEMS } from "../nav";
-
-function greeting(timeZone: string): string {
-  // "Good morning" is based on the user's configured timezone, not the browser's.
-  let hour: number;
-  try {
-    hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone }).format(new Date()));
-  } catch {
-    hour = new Date().getHours();
-  }
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-/**
- * Placeholder dashboard. Deliberately shows NO numbers: every metric on the real dashboard
- * (Milestone 11) will be computed from the database, and a fake figure here would break that rule.
- */
-export function DashboardPage() {
-  const user = useAuthStatus().data?.user;
-  if (!user) return null;
-  return (
-    <>
-      <PageHeader title={`${greeting(user.timezone)}, ${user.display_name}`} description="Here's where your day will come together." />
-      <EmptyState icon={Compass} title="Nothing to show yet">
-        Your dashboard fills in from real data as you add tasks, courses, habits and projects. Every number here will come
-        straight from your database, so there is nothing to display until you start using the app.
-      </EmptyState>
-    </>
-  );
-}
 
 /** Honest placeholder for routes whose feature has not been built yet. */
 export function ComingSoonPage() {

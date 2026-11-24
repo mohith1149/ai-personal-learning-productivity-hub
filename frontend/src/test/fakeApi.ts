@@ -3,6 +3,7 @@
 import { vi } from "vitest";
 import type { Category, Recurring, Task } from "../api/tasks";
 import { todayIn } from "../lib/dates";
+import { emptyDashboard } from "./fakeDashboard";
 
 export const USER = { id: 1, email: "me@example.com", display_name: "Ada Lovelace", timezone: "Asia/Kolkata" };
 export const TODAY = todayIn(USER.timezone);
@@ -92,6 +93,7 @@ export function installFakeApi(seed: { tasks?: Task[]; categories?: Category[]; 
     failNext: () => {},
     callsTo: (method, re) => f.calls.filter((c) => c.method === method && re.test(c.path)),
   };
+  f.handlers.push(({ method, path }) => (path === "/api/dashboard" && method === "GET" ? Response.json(emptyDashboard()) : undefined)); // default: a new, empty account
   const failures: { match: RegExp; status: number; detail: string; left: number }[] = [];
   f.failNext = (match, status, detail, times = 1) => failures.push({ match, status, detail, left: times });
 
