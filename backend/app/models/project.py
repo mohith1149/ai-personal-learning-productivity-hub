@@ -17,6 +17,7 @@ from app.database import Base, UTCDateTime
 from app.models.base import IdMixin, OwnedMixin, TimestampMixin, in_values
 
 PROJECT_STATUSES = ("active", "paused", "completed", "archived")
+PROJECT_ORIGINS = ("new", "existing")
 IDEA_STATUSES = ("backlog", "in_progress", "done", "dropped")
 CHALLENGE_STATUSES = ("planned", "in_progress", "completed", "missed", "excused")
 CHALLENGE_MODES = ("new_project", "existing_project")
@@ -53,10 +54,16 @@ class Project(IdMixin, OwnedMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(in_values("status", PROJECT_STATUSES), name="status"),
         CheckConstraint("priority BETWEEN 1 AND 4", name="priority"),
+        CheckConstraint(in_values("origin", PROJECT_ORIGINS), name="origin"),
+        # completed <=> completed_at is set: a project is only completed by an explicit action
+        CheckConstraint("(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"),
+        UniqueConstraint("user_id", "title", name="uq_projects_user_title"),
         Index("ix_projects_user_status", "user_id", "status"),
     )
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
+    origin: Mapped[str] = mapped_column(String(10), default="new", nullable=False)  # started here, or already existed
+    start_date: Mapped[DateT | None] = mapped_column(Date)
     description: Mapped[str | None] = mapped_column(Text)
     objective: Mapped[str | None] = mapped_column(Text)
     problem_statement: Mapped[str | None] = mapped_column(Text)
@@ -83,11 +90,18 @@ class Project(IdMixin, OwnedMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="ProjectMilestone.position",
     )
+    sessions: Mapped[list["ProjectSession"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="ProjectSession.date.desc()"
+    )
 
 
 class ProjectMilestone(IdMixin, TimestampMixin, Base):
     __tablename__ = "project_milestones"
-    __table_args__ = (CheckConstraint(in_values("status", ("pending", "done")), name="status"),)
+    __table_args__ = (
+        CheckConstraint(in_values("status", ("pending", "done")), name="status"),
+        CheckConstraint("(status = 'done') = (completed_at IS NOT NULL)", name="completed_at_matches_status"),
+        UniqueConstraint("project_id", "title", name="uq_project_milestones_project_title"),
+    )
 
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False
@@ -210,6 +224,7 @@ class ProjectSession(IdMixin, OwnedMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("minutes > 0", name="minutes_positive"),
         Index("ix_project_sessions_project_date", "project_id", "date"),
+        Index("ix_project_sessions_user_date", "user_id", "date"),
     )
 
     project_id: Mapped[int] = mapped_column(
@@ -221,3 +236,5 @@ class ProjectSession(IdMixin, OwnedMixin, TimestampMixin, Base):
     milestone_id: Mapped[int | None] = mapped_column(
         ForeignKey("project_milestones.id", ondelete="SET NULL")
     )
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"))
+    notes: Mapped[str | None] = mapped_column(Text)

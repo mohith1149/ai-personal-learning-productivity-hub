@@ -66,9 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/projects",
         label: "Projects",
         icon: FolderGit2,
-        status: "soon",
-        milestone: "Milestone 8",
-        blurb: "Project ideas, milestones and work sessions.",
+        status: "ready",
       },
       {
         to: "/habits",

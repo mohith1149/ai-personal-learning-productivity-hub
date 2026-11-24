@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 8 (projects) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: daily planner (milestone 10), then daily challenge (milestone 9) |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -477,17 +477,32 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Test infra: global Testing Library wait raised to 4s (`src/test/setup.ts`) after a parallel-load flake in the courses test.
 - Not built: habit reminders (Phase 5), archive (the `archived_at` column is unused), monthly weekly-habit percent (shown as days done).
 
+**Milestone 8: Projects (done, branch `feat/projects`)**
+- Routes `/projects` (cards, status filter) and `/projects/:id` (overview, milestones, tasks, development sessions, notes). Migration `a7c1e4f8b3d9`: `projects.origin`
+  (new/existing), `projects.start_date`, unique title per user, CHECK completed<=>completed_at (projects and milestones), unique milestone title per project,
+  `project_sessions.task_id/notes` (+ index). The `ProjectSession` model already existed from the Phase 3 schema migration; no duplicate table was added.
+- Endpoints: `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST /projects/{id}/milestones|tasks|sessions`, `PATCH/DELETE /project-milestones/{id}`,
+  `POST /project-milestones/{id}/status`, `DELETE /project-sessions/{id}`. Project writes return the refreshed detail (milestones, tasks, sessions, computed progress).
+- **Progress is computed**: (done milestones + completed tasks) / (milestones + non-cancelled tasks), floored; time/days/sessions are sums over `project_sessions`. A project is
+  completed (and a milestone done) ONLY by an explicit action; finishing every milestone does not complete the project. `repo_url` must be `https://github.com/owner/repo`
+  (normalised, `.git`/trailing slash stripped). "Existing" projects don't get an invented start date.
+- Project tasks are real `tasks` rows (`project_id`, `task_type='project_dev'`): they show on the Tasks page and are completed through the normal task status
+  (`PATCH /tasks/{id}`), which moves project progress. Deleting a project keeps its tasks (detached) but deletes milestones and sessions.
+- Tests: backend `test_projects.py`, `test_projects_api.py` (83), frontend `projects.test.tsx` (24) with `fakeProjects.ts`.
+- Not built: GitHub verification of repos/commits (Phase 4), milestone reordering, linking ideas (`project_ideas` table exists, used by Milestone 9).
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-7 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, **habits**). Real `hub.db` at migration `f6b9d3e2a5c7`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-8 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, **projects**). Real `hub.db` at migration `a7c1e4f8b3d9`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), **9 projects ← NEXT (= our Milestone 8)**, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/projects`; project tracker (name, description, objective, tech stack, GitHub repo URL, status, priority, start/target date, milestones,
-  project tasks, development sessions, notes, progress computed from milestones/tasks), CRUD, new and existing projects. Owner spec section 10.
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), **10 planner ← NEXT** (owner asked for projects first; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; then Milestone 9 daily challenge), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/planner`; daily planner (owner spec section 11): one day view combining tasks, deadlines, course lessons, ByteByteGo videos,
+  roadmap topics, habits, project work; complete from the planner (delegating to each feature's own service), reschedule tasks (rescheduled != completed), overdue, completed,
+  excused (needs a reason; excuse table design pending), daily study time and productivity summary. Then Milestone 9 (daily challenge with evidence).
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.
