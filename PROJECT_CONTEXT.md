@@ -557,6 +557,23 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   (253 tests) is slow under parallel load; two long tests were flaking at the old limits.
 - Not built: chat UI and live provider (Phase 6), OpenAI/Gemini adapters, weekly report tool, GitHub commit tool (Phase 4), streaming, conversation memory summarisation, notifying the model when a proposal is approved.
 
+### Phase 3 verification pass (branch `feat/phase3-verification`)
+
+- New `backend/tests/test_integration.py`: (1) a route sweep read from the OpenAPI schema (this FastAPI version nests included routers, so
+  `app.routes` is not flat): every method+path except health and the sign-in routes must answer 401 without login; (2) no GET response
+  contains a password hash, the signing key or the password; (3) one whole day through tasks, habits, courses, videos, projects, challenge
+  and then an assistant proposal that is partly approved and partly rejected, checking after each step that planner = dashboard
+  and that a proposal changes nothing until approved; (4) a second user's services return nothing of user 1's data; (5) a test that documents the planner/roadmap contract above.
+- **Finding (not changed, by design):** `/api/planner` called on a brand-new account, before the dashboard or roadmap page was ever opened, has no roadmap
+  topic, because the roadmap is created lazily and `test_planner` deliberately asserts that merely viewing the planner never creates it. The dashboard
+  (the landing page) seeds it, after which both agree. I first "fixed" this by seeding inside the planner, 29 planner tests failed, and I reverted it
+  because it overrode that earlier tested decision. The assistant's `get_plan` tool has the same first-call gap.
+- README.md rewritten from a 2-line stub: honest status table, what each page does, run/test commands, security notes.
+- Owner's Phase 3 list re-checked against the code (see handoff): everything in items 1-10 is built and tested. Settings is read-only
+  (account details + theme); profile/timezone editing is not built. Seed data (item 11) exists as course templates, the seeded roadmap and
+  `plans/bytebytego_21_day.txt` + `scripts/apply_plan.py`; there is no demo-data generator by design (no invented records).
+  No real-browser run lives in the repo (see Known issues): UI is covered by Vitest with a fake API only.
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
@@ -565,9 +582,8 @@ Updated 2026-11-24. **Rule from the owner: always save progress in this file (no
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); Milestone 11 dashboard ✅; Milestone 12 AI foundation ✅; **integration tests, docs, final verification of Phase 3 ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/phase3-verification`: cross-feature integration tests (e.g. a day end to end through tasks, videos, challenge, planner, dashboard, assistant approval), refresh README/docs,
-  re-check every Phase 3 requirement honestly, then Phase 4 (GitHub verification; needs the owner's GitHub credentials, asked only then).
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); Milestone 11 dashboard ✅; Milestone 12 AI foundation ✅; integration tests + docs + verification pass (Milestone 13) ✅ on `feat/phase3-verification`), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: Phase 4 (GitHub verification of challenge commits; needs the owner's GitHub credentials, asked only then). Branch `feat/github-verification`.
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.
