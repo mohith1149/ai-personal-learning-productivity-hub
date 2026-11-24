@@ -22,6 +22,9 @@ class Habit(IdMixin, OwnedMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(in_values("frequency", ("daily", "weekly")), name="frequency"),
         CheckConstraint("target_per_period >= 1", name="target"),
+        CheckConstraint("target_per_period <= 7", name="target_max"),
+        CheckConstraint("target_value IS NULL OR target_value > 0", name="target_value_positive"),
+        UniqueConstraint("user_id", "name", name="uq_habits_user_name"),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)

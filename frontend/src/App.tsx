@@ -5,6 +5,7 @@ import { NAV_GROUPS } from "./nav";
 import { LoginPage, SetupPage } from "./pages/AuthPages";
 import { CourseDetailPage } from "./pages/courses/CourseDetailPage";
 import { CoursesPage } from "./pages/courses/CoursesPage";
+import { HabitsPage } from "./pages/habits/HabitsPage";
 import { RoadmapPage } from "./pages/roadmap/RoadmapPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
 import { VideosPage } from "./pages/videos/VideosPage";
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="courses/:courseId" element={<CourseDetailPage />} />
         <Route path="videos" element={<VideosPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
+        <Route path="habits" element={<HabitsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         {/* Signed-in users who visit /login or /setup land on the dashboard. */}
         <Route path="login" element={<Navigate to="/" replace />} />

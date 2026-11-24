@@ -227,7 +227,7 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Videos | `GET /videos/next` (first unwatched video across active playlists), `PATCH/DELETE /videos/{id}`, `POST /videos/{id}/start\|complete\|uncomplete\|move` | ✅ (tested + live) |
 | Learning sessions | `GET /learning-sessions?course_id&limit&offset`, `POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ✅ (tested + live) |
 | Roadmap | `GET /roadmap`, `POST /roadmap/topics`, `PATCH/DELETE /roadmap/topics/{id}`, `POST /roadmap/topics/{id}/status`, `GET/POST /roadmap/topics/{id}/study` | ✅ (tested) |
-| Habits | `GET/POST /habits`, `PATCH/DELETE /habits/{id}`, `PUT /habits/{id}/logs/{date}`, `GET /habits/{id}/stats` | ⏳ |
+| Habits | `GET/POST /habits`, `GET/PATCH/DELETE /habits/{id}`, `PUT/DELETE /habits/{id}/logs/{date}`, `GET /habits/{id}/logs` | ✅ (tested) |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, milestones `POST /projects/{id}/milestones`, `PATCH/DELETE /milestones/{id}` | ⏳ |
 | Project ideas | `GET/POST /project-ideas`, `PATCH/DELETE /project-ideas/{id}`, `POST /project-ideas/{id}/start`, `GET /project-ideas/recommend` | ⏳ |
 | Daily challenge | `GET /challenges/today`, `POST /challenges`, `PATCH /challenges/{id}`, `POST /challenges/{id}/complete`, `/excuse`, `GET /challenges/calendar?start&end` | ⏳ |
@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 7 (habits) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 8 (projects) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -465,17 +465,29 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Frontend: `pages/roadmap/RoadmapPage.tsx`, `api/roadmap.ts`; tests `roadmap.test.tsx` (12) + `fakeRoadmap.ts`; backend `test_roadmap.py`, `test_roadmap_api.py` (33).
 - Not built here: roadmap-based daily suggestions (Milestone 9/10), reordering topics, stage CRUD (only topics can be added).
 
+**Milestone 7: Habits (done, branch `feat/habits`)**
+- Route `/habits`. Migration `f6b9d3e2a5c7`: unique habit name per user, days-per-week CHECK 1..7, positive `target_value`.
+- Endpoints: `GET/POST /habits`, `GET/PATCH/DELETE /habits/{id}`, `PUT /habits/{id}/logs/{date}` (create/replace the day's record), `DELETE /habits/{id}/logs/{date}`,
+  `GET /habits/{id}/logs?days=` (history). Every write returns the refreshed habit.
+- Everything shown is **computed from `habit_logs`** (`services/habits.py`, pure functions `daily_streak`/`weekly_streak`): daily streak = consecutive completed days (today not
+  yet logged doesn't break it); weekly habit (N days/week, weeks Mon-Sun) streak = consecutive weeks meeting N; week/month progress, total, last-28-day strip, `due_today`.
+  Days before `start_date` never count; no records in the future (user's timezone) or before the start date. `completed=false` record = a note about a missed day (doesn't count).
+- Bug found by tests and fixed: a reply built right after a write used a stale in-session copy (fixed with `populate_existing`).
+- Frontend: `pages/habits/HabitsPage.tsx` (cards with Mark done today/Undo, 28-day clickable strip, amount+note dialog, history, edit, delete), `api/habits.ts`; tests `habits.test.tsx` (16), backend `test_habits.py` + `test_habits_api.py` (60).
+- Test infra: global Testing Library wait raised to 4s (`src/test/setup.ts`) after a parallel-load flake in the courses test.
+- Not built: habit reminders (Phase 5), archive (the `archived_at` column is unused), monthly weekly-habit percent (shown as days done).
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-6 done (auth, shell, tasks, courses, videos+YouTube, **AI roadmap**). Real `hub.db` at migration `e5a8c2d1f4b6`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-7 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, **habits**). Real `hub.db` at migration `f6b9d3e2a5c7`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  **8 habits ← NEXT (= our Milestone 7)**, 9 projects, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/habits`; customizable habits (name, description, frequency, target, start date, active flag, daily completion records, notes),
-  CRUD, daily completion, history, weekly/monthly progress, and streaks computed from the completion records (never hardcoded). Owner spec section 9.
+  8 habits ✅ (= our Milestone 7), **9 projects ← NEXT (= our Milestone 8)**, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/projects`; project tracker (name, description, objective, tech stack, GitHub repo URL, status, priority, start/target date, milestones,
+  project tasks, development sessions, notes, progress computed from milestones/tasks), CRUD, new and existing projects. Owner spec section 10.
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.
