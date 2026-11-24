@@ -19,6 +19,7 @@ from app.models.learning import (  # noqa: F401
     RoadmapStage,
     RoadmapTopic,
     Video,
+    VideoPlaylist,
 )
 from app.models.project import (  # noqa: F401
     DailyChallenge,

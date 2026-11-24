@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routers import auth, courses, tasks
+from app.routers import auth, courses, tasks, videos
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -12,3 +12,5 @@ api_router.include_router(courses.modules_router)
 api_router.include_router(courses.lessons_router)
 api_router.include_router(courses.sessions_router)
 api_router.include_router(courses.templates_router)
+api_router.include_router(videos.playlists_router)
+api_router.include_router(videos.videos_router)
