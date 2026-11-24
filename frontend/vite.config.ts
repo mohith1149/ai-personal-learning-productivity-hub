@@ -14,6 +14,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // Long multi-step user-flow tests got close to the 5s default when many files run in parallel; passing tests still finish as fast as before.
+    testTimeout: 20000,
   },
   server: {
     port: 5173,

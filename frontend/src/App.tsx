@@ -1,11 +1,11 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuthStatus } from "./api/auth";
 import { AppLayout } from "./components/AppLayout";
-import { NAV_GROUPS } from "./nav";
 import { LoginPage, SetupPage } from "./pages/AuthPages";
 import { CourseDetailPage } from "./pages/courses/CourseDetailPage";
 import { CoursesPage } from "./pages/courses/CoursesPage";
 import { HabitsPage } from "./pages/habits/HabitsPage";
+import { AssistantPage } from "./pages/assistant/AssistantPage";
 import { ChallengePage } from "./pages/challenge/ChallengePage";
 import { PlannerPage } from "./pages/planner/PlannerPage";
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage";
@@ -14,7 +14,7 @@ import { RoadmapPage } from "./pages/roadmap/RoadmapPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
 import { VideosPage } from "./pages/videos/VideosPage";
 import { DashboardPage } from "./pages/dashboard/DashboardPage";
-import { ComingSoonPage, NotFoundPage, SettingsPage } from "./pages/ShellPages";
+import { NotFoundPage, SettingsPage } from "./pages/ShellPages";
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
   return (
@@ -60,12 +60,6 @@ export default function App() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
-        {/* Features not built yet render an honest placeholder; each milestone replaces its route below. */}
-        {NAV_GROUPS.flatMap((g) => g.items)
-          .filter((i) => i.status === "soon")
-          .map((i) => (
-            <Route key={i.to} path={i.to} element={<ComingSoonPage />} />
-          ))}
         <Route path="tasks" element={<TasksPage />} />
         <Route path="courses" element={<CoursesPage />} />
         <Route path="courses/:courseId" element={<CourseDetailPage />} />
@@ -74,6 +68,7 @@ export default function App() {
         <Route path="habits" element={<HabitsPage />} />
         <Route path="planner" element={<PlannerPage />} />
         <Route path="challenge" element={<ChallengePage />} />
+        <Route path="assistant" element={<AssistantPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />

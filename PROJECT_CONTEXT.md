@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: AI foundation (milestone 12) |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: integration tests, docs, final verification |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -538,18 +538,36 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Tests: backend `test_dashboard.py` (7); frontend `dashboard.test.tsx` (13) + `fakeDashboard.ts` (the default fake API serves an empty dashboard; `shell.test.tsx` has its own handler).
 - Not built: weekly/monthly charts, per-day challenge strip, dashboard reminders by email (Phase 5).
 
+**Milestone 12: AI foundation (done, branch `feat/ai-foundation`)**
+- NO live AI. No provider has been called for real; `GET /ai/status` always reports `live_verified: false`. AI is OFF unless `AI_PROVIDER=anthropic` AND `ANTHROPIC_API_KEY` are both set
+  in `backend/.env` (a key alone does nothing; default `AI_PROVIDER=none`). The live Claude connection and chat window are Phase 6.
+- Tables already existed (`ai_conversations`, `ai_messages`, `ai_pending_actions`, `ai_memories`), so no migration. Code: `app/ai/` (types, providers, tools, prompt), `services/assistant.py`
+  (conversations, tool loop, approvals), `services/ai_memory.py`, `routers/assistant.py` (`/api/ai/*`).
+- Provider interface `LLMProvider.complete(system, messages, tools) -> LLMResponse`; messages are provider-neutral Anthropic-style blocks (text / tool_use / tool_result).
+  `ScriptedProvider` (offline, tests) and `AnthropicProvider` (request/response translation verified ONLY against a stub client; errors are reduced to the exception class so the key never leaks).
+- 16 tools = thin wrappers over services, strict pydantic args (`extra=forbid`, no user id argument, so a model can't reach another user's data). 10 READ tools run immediately
+  (today/pending tasks, plan, dashboard, courses, next video, projects, roadmap, habits, challenge status). 6 WRITE tools (create_task, complete_task, reschedule_task, record_project_progress,
+  create_project_challenge, remember) never run in the loop: they store an `ai_pending_actions` row ("awaiting approval") and run only on `POST /ai/pending/{id}/approve` (args re-validated,
+  claimed first so double-approve conflicts, result stored, status executed/failed). There is deliberately NO tool to complete a challenge (evidence must come from the user) or to delete anything.
+- Loop: max 6 rounds, max 5 proposals per turn and 20 open, history capped at 40 messages and never starts mid tool-exchange, message <= 4000 chars. System prompt rules: only state facts a tool returned,
+  evidence is unverified, proposals aren't done until executed; saved memories are framed as data. Chat answers 503 with no provider, 502 on a provider error.
+- Endpoints: `GET /ai/status`, `GET /ai/tools`, `GET/POST/DELETE /ai/memories`, `POST /ai/chat`, `GET /ai/conversations[/{id}]`, `DELETE /ai/conversations/{id}`, `GET /ai/pending?status=`, `POST /ai/pending/{id}/approve|reject`.
+- Frontend `/assistant` (now a real page; the "coming soon" placeholder mechanism and its test were removed since nothing is unbuilt in the nav): connection status, approval queue, memory (add/delete), tool list. No chat box yet.
+- Tests: backend `test_assistant.py` (38), `test_assistant_api.py` (27); frontend `assistant.test.tsx` (11) + `fakeAssistant.ts`. Frontend test stability: `testTimeout` 20s (vite.config.ts) and Testing Library `asyncUtilTimeout` 10s because the full suite
+  (253 tests) is slow under parallel load; two long tests were flaking at the old limits.
+- Not built: chat UI and live provider (Phase 6), OpenAI/Gemini adapters, weekly report tool, GitHub commit tool (Phase 4), streaming, conversation memory summarisation, notifying the model when a proposal is approved.
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-11 done (11 = dashboard) (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, daily planner, **daily AI project challenge**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-12 done (12 = AI foundation, no live AI) (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, daily planner, **daily AI project challenge**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); Milestone 11 dashboard ✅; **Milestone 12 AI foundation ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/ai-foundation`; Milestone 12: provider abstraction (Claude/OpenAI/Gemini interface, none connected yet), tool-calling layer where the LLM only calls
-  service functions (never the DB), read tools immediate / write tools create pending actions needing approval, memory. No live provider is claimed until implemented and tested.
-  Then integration tests, docs, final verification.
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); Milestone 11 dashboard ✅; Milestone 12 AI foundation ✅; **integration tests, docs, final verification of Phase 3 ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/phase3-verification`: cross-feature integration tests (e.g. a day end to end through tasks, videos, challenge, planner, dashboard, assistant approval), refresh README/docs,
+  re-check every Phase 3 requirement honestly, then Phase 4 (GitHub verification; needs the owner's GitHub credentials, asked only then).
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.

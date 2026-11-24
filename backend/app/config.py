@@ -53,6 +53,7 @@ class Settings(BaseSettings):
 
     # Anthropic
     youtube_api_key: str | None = None  # YouTube Data API v3 key; backend only, never sent to the browser
+    ai_provider: str = "none"  # "none" (default, AI off) or "anthropic"; the key alone never turns AI on
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5-5"
 
