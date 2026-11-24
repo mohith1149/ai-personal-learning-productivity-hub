@@ -27,6 +27,13 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     with engine.connect() as connection:
+        sqlite = connection.dialect.name == "sqlite"
+        if sqlite:
+            # SQLite batch mode rebuilds tables (CREATE new, copy, DROP old, RENAME). With foreign keys enforced, DROPping
+            # a parent table CASCADE-DELETES its children, silently losing data. The pragma is a no-op inside a
+            # transaction, so it is switched off here, before any migration work begins, and checked afterwards.
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.commit()  # end SQLAlchemy's autobegun transaction so Alembic owns (and commits) the next one
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
@@ -35,6 +42,12 @@ def run_migrations_online() -> None:
         )
         with context.begin_transaction():
             context.run_migrations()
+        connection.commit()
+        if sqlite:
+            broken = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            if broken:
+                raise RuntimeError(f"Migration left dangling foreign keys: {broken[:5]}")
 
 
 if context.is_offline_mode():

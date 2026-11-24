@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-24 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks), 4 (courses) and 5 (video playlists) done.
+Last updated: 2026-11-24 — YouTube tracker (spec #7) built on feat/youtube-tracker. Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks), 4 (courses) and 5 (video playlists) done.
 
 ---
 
@@ -431,12 +431,28 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   production build only — **not** by driving a real browser this milestone (the earlier headless-Edge runs were scratch scripts).
 - Ops: the real `hub.db` was backed up (`backend/data/backups/hub-before-videos-*.db`, git-ignored) before migrating to `c3e6a9d4b2f8`.
 
+**Milestone 5b: YouTube channel & playlist tracker (owner spec #7, branch `feat/youtube-tracker`)**
+- **Library model** (migration `d4f7b1c9e3a5`): `videos` is now one row per user per YouTube video (unique `(user_id, youtube_video_id)`), with
+  `thumbnail_url, duration_seconds, published_at, channel_id, channel_title, removed_at`; `position`/`playlist_id` are gone. New table
+  `video_memberships(playlist_id, video_id, position)` links videos to collections, so one video can be in a channel AND a playlist with shared
+  progress. `video_playlists` gained `kind` (collection/playlist/channel), `youtube_channel_id`, `thumbnail_url`, `reported_total` (NULL = YouTube
+  did not say, shown as "unavailable"), `retrieved_count`, `recommend_order` (oldest/newest/manual; default oldest). Deleting a playlist keeps its videos.
+- **Remove vs delete**: `POST /videos/{id}/remove|restore` (soft, `removed_at`, hidden from lists/counts/recommendations) vs `DELETE /videos/{id}` (permanent).
+  Neither touches YouTube. Re-importing a removed video restores it. Status labels: unwatched/watching/completed = Not started/In progress/Completed.
+- **Recommendation (SQL)**: `status != 'completed' AND removed_at IS NULL ORDER BY published_at ASC|DESC` (undated videos last, then position). `GET /videos/next?order=oldest|newest`.
+- **Progress**: per collection (`total/completed/in_progress/unwatched/percent` + `reported_total` vs `retrieved_count`) and overall `GET /videos/stats`. Library list `GET /videos?view=all|open|completed|removed&status&sort=recommended|newest|oldest|completed|added&q`; `POST /videos/{id}/status`.
+- **YouTube** (`services/youtube.py`, `services/youtube_import.py`, `routers/youtube.py`): `GET /youtube/status` (configured? never the key), `POST /youtube/preview {url, limit|null}` (read-only), `POST /youtube/import {url, video_ids, retrieved}` (only ticked videos; metadata re-read server-side). Accepts `@handle`, `/channel/UC..`, `/@x/videos`, `/playlist?list=`, `watch?v=&list=`. Key = `YOUTUBE_API_KEY` in `backend/.env`, sent in the `X-Goog-Api-Key` header (never the URL: httpx logs URLs). Errors: 422 invalid/private, 404 not found, 429 quota, 503 no/bad key, 502 network. A same-named hand-made collection is adopted on import. Paging cap 2000.
+- Verified LIVE with the owner's key: ByteByteGo = 172 videos on YouTube, 25 retrieved over page tokens, thumbnails/durations present, playlist "System Design Fundamentals" 104 videos, bad links give clear errors. No watch history is read (the API has none).
+- Alembic env now sets `PRAGMA foreign_keys=OFF` during migrations: SQLite batch rebuilds were cascade-deleting child rows (found when testing this migration).
+- Frontend: `pages/videos/` (`VideosPage` overview + "Watch next" card + collection tabs + filters/sort + card grid, `VideoCard`, `ImportModal` 3-step, `VideoForms`), `api/youtube.ts`, `lib/format.ts`. Tests: backend 500+ (library, client, import API), frontend 145.
+- Not built: Google Takeout watch-history import; thumbnails are hot-linked from YouTube.
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestone 5 (video playlists) committed on `feat/videos` and merged into `main` with `--no-ff`; both pushed to GitHub.
-  Done: auth, app shell, tasks, courses, video playlists. Real `hub.db` is migrated to `c3e6a9d4b2f8`.
+- State: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+  Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), **7 AI roadmap ← NEXT (= our Milestone 6)**,
   8 habits, 9 projects, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.

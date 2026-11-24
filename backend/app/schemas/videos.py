@@ -18,12 +18,17 @@ class _HasSourceUrl(Strict):
         return _check_url(v)  # only http(s): the link is rendered as a clickable anchor
 
 
+RecommendOrder = Literal["oldest", "newest", "manual"]
+VideoStatus = Literal["unwatched", "watching", "completed"]
+
+
 class PlaylistCreate(_HasSourceUrl):
     name: str = Field(min_length=1, max_length=120)
     source_url: Url | None = None
     description: Notes | None = None
     daily_target: DailyTarget = 1
     active: bool = True
+    recommend_order: RecommendOrder = "oldest"
 
 
 class PlaylistUpdate(_HasSourceUrl):
@@ -32,6 +37,7 @@ class PlaylistUpdate(_HasSourceUrl):
     description: Notes | None = None
     daily_target: DailyTarget | None = None
     active: bool | None = None
+    recommend_order: RecommendOrder | None = None
 
 
 class VideoCreate(_HasUrl):
@@ -59,22 +65,32 @@ class BulkVideos(Strict):
 
 class Move(Strict):
     direction: Literal["up", "down"]
+    playlist_id: int  # the order is per collection
+
+
+class SetStatus(Strict):
+    status: VideoStatus
 
 
 class VideoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    playlist_id: int
     title: str
     url: str | None
     youtube_video_id: str | None
     description: str | None
     category: str | None
     status: str
-    position: int
     completed_at: datetime | None
     notes: str | None
-    created_at: datetime
+    thumbnail_url: str | None
+    duration_seconds: int | None
+    published_at: datetime | None
+    channel_id: str | None
+    channel_title: str | None
+    removed_at: datetime | None
+    created_at: datetime  # "date added"
+    playlist_ids: list[int]
 
 
 class VideoList(BaseModel):
@@ -85,18 +101,38 @@ class VideoList(BaseModel):
 class PlaylistSummary(BaseModel):
     id: int
     name: str
+    kind: str
     source_url: str | None
     youtube_playlist_id: str | None
+    youtube_channel_id: str | None
+    thumbnail_url: str | None
     description: str | None
     daily_target: int
     active: bool
-    total_videos: int
+    recommend_order: str
+    reported_total: int | None  # what YouTube said exists; None = unavailable (never estimated)
+    retrieved_count: int  # how many the last fetch actually retrieved
+    total_videos: int  # in the library (removed ones excluded)
     completed_videos: int
-    percent: int  # floor, so 100 only when every video is watched
+    in_progress_videos: int
+    unwatched_videos: int
+    percent: int  # completed / total in library, floored, so 100 only when every video is watched
     watched_today: int  # videos completed during the user's local day
     remaining_today: int  # max(daily_target - watched_today, 0)
     next_video: VideoOut | None
     created_at: datetime
+
+
+class LibraryStats(BaseModel):
+    """Overall progress across the whole library (removed videos are not counted)."""
+
+    total: int
+    completed: int
+    in_progress: int
+    unwatched: int
+    percent: int
+    removed: int
+    next_video: VideoOut | None
 
 
 class TodayOut(BaseModel):
@@ -108,6 +144,7 @@ class TodayOut(BaseModel):
 
 
 class BulkResult(BaseModel):
-    added: int
-    duplicates: int
+    added: int  # new library videos
+    linked: int  # already in the library, now also in this playlist
+    duplicates: int  # already in this playlist
     invalid: list[str]

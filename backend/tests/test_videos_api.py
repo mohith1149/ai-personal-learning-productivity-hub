@@ -11,7 +11,7 @@ def c(client):
 
 
 def new_playlist(c, **kw) -> dict:
-    r = c.post("/api/video-playlists", json={"name": "ByteByteGo", **kw})
+    r = c.post("/api/video-playlists", json={"name": "ByteByteGo", "recommend_order": "manual", **kw})
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -29,7 +29,8 @@ PROTECTED = [
     ("post", "/api/video-playlists/1/videos"), ("post", "/api/video-playlists/1/bulk-videos"),
     ("get", "/api/videos/next"), ("patch", "/api/videos/1"), ("delete", "/api/videos/1"),
     ("post", "/api/videos/1/start"), ("post", "/api/videos/1/complete"), ("post", "/api/videos/1/uncomplete"),
-    ("post", "/api/videos/1/move"),
+    ("post", "/api/videos/1/move"), ("get", "/api/videos"), ("get", "/api/videos/stats"),
+    ("post", "/api/videos/1/status"), ("post", "/api/videos/1/remove"), ("post", "/api/videos/1/restore"),
 ]
 
 
@@ -85,8 +86,9 @@ def test_video_round_trip_and_shape(c):
     p = new_playlist(c)
     v = add(c, p["id"], "How DNS works", url="https://youtu.be/dQw4w9WgXcQ", category="Networking",
             description="d", notes="n")
-    assert v["status"] == "unwatched" and v["completed_at"] is None and v["position"] == 1
-    assert v["youtube_video_id"] == "dQw4w9WgXcQ" and v["playlist_id"] == p["id"]
+    assert v["status"] == "unwatched" and v["completed_at"] is None and v["removed_at"] is None
+    assert v["youtube_video_id"] == "dQw4w9WgXcQ" and v["playlist_ids"] == [p["id"]]
+    assert v["thumbnail_url"] is None and v["duration_seconds"] is None and v["published_at"] is None
     r = c.patch(f"/api/videos/{v['id']}", json={"title": "DNS", "notes": None})
     assert r.status_code == 200 and r.json()["title"] == "DNS" and r.json()["notes"] is None
     assert c.delete(f"/api/videos/{v['id']}").status_code == 204
@@ -114,7 +116,7 @@ def test_bulk_paste(c):
     p = new_playlist(c)
     lines = ["How DNS works | https://youtu.be/aaaaaaaaaaa", "https://youtu.be/aaaaaaaaaaa", "nope"]
     r = c.post(f"/api/video-playlists/{p['id']}/bulk-videos", json={"lines": lines, "category": "Sys"})
-    assert r.status_code == 201 and r.json() == {"added": 1, "duplicates": 1, "invalid": ["nope"]}
+    assert r.status_code == 201 and r.json() == {"added": 1, "linked": 0, "duplicates": 1, "invalid": ["nope"]}
     items = c.get(f"/api/video-playlists/{p['id']}/videos").json()["items"]
     assert [i["title"] for i in items] == ["How DNS works"] and items[0]["category"] == "Sys"
     assert c.post(f"/api/video-playlists/{p['id']}/bulk-videos", json={"lines": []}).status_code == 422
@@ -194,29 +196,32 @@ def test_list_filters_and_validation(c):
 def test_move_endpoint(c):
     p = new_playlist(c)
     a, b = add(c, p["id"], "A"), add(c, p["id"], "B")
-    assert c.post(f"/api/videos/{b['id']}/move", json={"direction": "up"}).status_code == 200
+    assert c.post(f"/api/videos/{b['id']}/move", json={"direction": "up", "playlist_id": p["id"]}).status_code == 200
     items = c.get(f"/api/video-playlists/{p['id']}/videos").json()["items"]
     assert [i["title"] for i in items] == ["B", "A"]
-    assert c.post(f"/api/videos/{b['id']}/move", json={"direction": "sideways"}).status_code == 422
+    assert c.post(f"/api/videos/{b['id']}/move", json={"direction": "sideways", "playlist_id": p["id"]}).status_code == 422
 
 
-def test_deleting_a_playlist_deletes_its_videos(c):
+def test_deleting_a_playlist_keeps_its_videos_in_the_library(c):
     p = new_playlist(c)
     v = add(c, p["id"], "A")
-    c.delete(f"/api/video-playlists/{p['id']}")
-    assert c.post(f"/api/videos/{v['id']}/complete").status_code == 404
+    assert c.delete(f"/api/video-playlists/{p['id']}").status_code == 204
+    kept = c.get("/api/videos").json()["items"]
+    assert [i["id"] for i in kept] == [v["id"]] and kept[0]["playlist_ids"] == []
 
 
 # ---------------- isolation between users ----------------
 
 
 def test_another_users_playlist_and_videos_look_like_not_found(c, db):
-    from app.models import User, Video, VideoPlaylist
+    from app.models import User, Video, VideoMembership, VideoPlaylist
     db.add(User(id=2, email="o@example.com", password_hash="x", display_name="O", timezone="UTC"))
     db.commit()
     db.add(VideoPlaylist(id=50, user_id=2, name="Theirs"))
     db.commit()
-    db.add(Video(id=60, user_id=2, playlist_id=50, title="Secret", position=1))
+    db.add(Video(id=60, user_id=2, title="Secret"))
+    db.commit()
+    db.add(VideoMembership(playlist_id=50, video_id=60, position=1))
     db.commit()
     assert c.get("/api/video-playlists").json() == []
     assert c.get("/api/video-playlists/50").status_code == 404
@@ -228,6 +233,16 @@ def test_another_users_playlist_and_videos_look_like_not_found(c, db):
     assert c.patch("/api/videos/60", json={"title": "x"}).status_code == 404
     assert c.delete("/api/videos/60").status_code == 404
     assert c.get("/api/videos/next").json() is None
+    for action in ("remove", "restore"):
+        assert c.post(f"/api/videos/60/{action}").status_code == 404
+    assert c.post("/api/videos/60/status", json={"status": "completed"}).status_code == 404
+    assert c.get("/api/videos").json() == {"items": [], "total": 0}
+    assert c.get("/api/videos/stats").json()["total"] == 0
+    for action in ("remove", "restore"):
+        assert c.post(f"/api/videos/60/{action}").status_code == 404
+    assert c.post("/api/videos/60/status", json={"status": "completed"}).status_code == 404
+    assert c.get("/api/videos").json() == {"items": [], "total": 0}
+    assert c.get("/api/videos/stats").json()["total"] == 0
 
 
 def test_logout_locks_the_video_api(c):

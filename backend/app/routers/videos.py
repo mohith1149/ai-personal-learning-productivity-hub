@@ -10,6 +10,14 @@ from app.services import videos as svc
 playlists_router = APIRouter(prefix="/video-playlists", tags=["videos"])
 videos_router = APIRouter(prefix="/videos", tags=["videos"])
 
+View = Literal["all", "open", "completed", "removed"]
+Sort = Literal["recommended", "newest", "oldest", "completed", "added"]
+SearchQ = Annotated[str | None, Query(max_length=200)]
+StatusQ = Annotated[Literal["unwatched", "watching", "completed"] | None, Query()]
+Limit = Annotated[int, Query(ge=1, le=500)]
+Offset = Annotated[int, Query(ge=0)]
+Order = Annotated[Literal["oldest", "newest"], Query()]
+
 ERRORS = (svc.NotFound, svc.RuleError, svc.Conflict)
 
 
@@ -67,12 +75,10 @@ def playlist_today(playlist_id: int, user: CurrentUser, db: DbSession):
 @playlists_router.get("/{playlist_id}/videos", response_model=s.VideoList)
 def list_videos(
     playlist_id: int, user: CurrentUser, db: DbSession,
-    view: Literal["all", "open", "completed"] = "all",
-    q: Annotated[str | None, Query(max_length=200)] = None,
-    limit: Annotated[int, Query(ge=1, le=500)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    view: View = "all", q: SearchQ = None, status: StatusQ = None, sort: Sort = "recommended",
+    limit: Limit = 100, offset: Offset = 0,
 ):
-    return _run(svc.list_videos, db, user, playlist_id, view, q, limit, offset)
+    return _run(svc.list_videos, db, user, playlist_id, view, q, status, sort, limit, offset)
 
 
 @playlists_router.post("/{playlist_id}/videos", response_model=s.VideoOut, status_code=status.HTTP_201_CREATED)
@@ -88,9 +94,23 @@ def bulk_add_videos(playlist_id: int, body: s.BulkVideos, user: CurrentUser, db:
 # ---------------- videos ----------------
 
 
+@videos_router.get("", response_model=s.VideoList)
+def list_library(
+    user: CurrentUser, db: DbSession, view: View = "all", q: SearchQ = None, status: StatusQ = None,
+    sort: Sort = "recommended", limit: Limit = 100, offset: Offset = 0,
+):
+    """The whole library, across every playlist and channel."""
+    return svc.list_videos(db, user, None, view, q, status, sort, limit, offset)
+
+
+@videos_router.get("/stats", response_model=s.LibraryStats)
+def library_stats(user: CurrentUser, db: DbSession, order: Order = "oldest"):
+    return svc.library_stats(db, user, order)
+
+
 @videos_router.get("/next", response_model=s.VideoOut | None)
-def next_video(user: CurrentUser, db: DbSession):
-    return svc.next_video_overall(db, user)
+def next_video(user: CurrentUser, db: DbSession, order: Order = "oldest"):
+    return svc.next_video_overall(db, user, order)
 
 
 @videos_router.patch("/{video_id}", response_model=s.VideoOut)
@@ -99,7 +119,7 @@ def update_video(video_id: int, body: s.VideoUpdate, user: CurrentUser, db: DbSe
 
 
 @videos_router.delete("/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_video(video_id: int, user: CurrentUser, db: DbSession) -> Response:
+def delete_video_permanently(video_id: int, user: CurrentUser, db: DbSession) -> Response:
     _run(svc.delete_video, db, user, video_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -119,6 +139,22 @@ def uncomplete_video(video_id: int, user: CurrentUser, db: DbSession):
     return _run(svc.uncomplete_video, db, user, video_id)
 
 
+@videos_router.post("/{video_id}/status", response_model=s.VideoOut)
+def set_status(video_id: int, body: s.SetStatus, user: CurrentUser, db: DbSession):
+    return _run(svc.set_status, db, user, video_id, body.status)
+
+
+@videos_router.post("/{video_id}/remove", response_model=s.VideoOut)
+def remove_video(video_id: int, user: CurrentUser, db: DbSession):
+    """Remove from the library (reversible). Does nothing on YouTube."""
+    return _run(svc.remove_video, db, user, video_id)
+
+
+@videos_router.post("/{video_id}/restore", response_model=s.VideoOut)
+def restore_video(video_id: int, user: CurrentUser, db: DbSession):
+    return _run(svc.restore_video, db, user, video_id)
+
+
 @videos_router.post("/{video_id}/move", response_model=s.VideoOut)
 def move_video(video_id: int, body: s.Move, user: CurrentUser, db: DbSession):
-    return _run(svc.move_video, db, user, video_id, body.direction)
+    return _run(svc.move_video, db, user, video_id, body.direction, body.playlist_id)
