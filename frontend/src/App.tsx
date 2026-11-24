@@ -6,6 +6,8 @@ import { LoginPage, SetupPage } from "./pages/AuthPages";
 import { CourseDetailPage } from "./pages/courses/CourseDetailPage";
 import { CoursesPage } from "./pages/courses/CoursesPage";
 import { HabitsPage } from "./pages/habits/HabitsPage";
+import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage";
+import { ProjectsPage } from "./pages/projects/ProjectsPage";
 import { RoadmapPage } from "./pages/roadmap/RoadmapPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
 import { VideosPage } from "./pages/videos/VideosPage";
@@ -67,6 +69,8 @@ export default function App() {
         <Route path="videos" element={<VideosPage />} />
         <Route path="roadmap" element={<RoadmapPage />} />
         <Route path="habits" element={<HabitsPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />
         {/* Signed-in users who visit /login or /setup land on the dashboard. */}
         <Route path="login" element={<Navigate to="/" replace />} />

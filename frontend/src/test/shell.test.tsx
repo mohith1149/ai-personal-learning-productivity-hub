@@ -92,10 +92,10 @@ describe("navigation", () => {
   });
 
   it("renders an honest placeholder for an unbuilt feature (no fake data)", async () => {
-    renderAt("/projects");
-    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    renderAt("/planner");
+    expect(await screen.findByRole("heading", { name: "Daily planner" })).toBeInTheDocument();
     expect(screen.getByText("Not built yet")).toBeInTheDocument();
-    expect(screen.getByText(/Planned: Milestone 8/)).toBeInTheDocument();
+    expect(screen.getByText(/Planned: Milestone 10/)).toBeInTheDocument();
   });
 
   it("shows a 404 page for unknown addresses", async () => {
