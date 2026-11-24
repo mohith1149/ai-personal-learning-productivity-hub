@@ -91,11 +91,9 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       {
         to: "/videos",
-        label: "ByteByteGo videos",
+        label: "Videos",
         icon: CirclePlay,
-        status: "soon",
-        milestone: "Milestone 5",
-        blurb: "Track videos you've watched. Completed videos are never recommended again.",
+        status: "ready",
       },
       {
         to: "/roadmap",

@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-23 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks) and 4 (courses) done.
+Last updated: 2026-11-24 — Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks), 4 (courses) and 5 (video playlists) done.
 
 ---
 
@@ -198,6 +198,12 @@ round-tripped up/down/up, `alembic check` reports no drift.
 (`(status='completed') = (completed_at IS NOT NULL)`), hand-written, repairs inconsistent rows first, round-tripped up/down/up,
 `alembic check` clean.
 
+**Migration `c3e6a9d4b2f8` (Milestone 5):** new table `video_playlists` (name, source_url, youtube_playlist_id, description,
+`daily_target` CHECK 1–50, active; unique `(user_id, name)`); `videos` gains `playlist_id` (NOT NULL, FK ON DELETE CASCADE),
+`youtube_video_id`, index `(playlist_id, status, position)` and unique `(playlist_id, youtube_video_id)` (NULL ids exempt).
+Hand-written: any pre-existing videos are moved into one "Imported videos" playlist per owner before `playlist_id` becomes NOT NULL
+(verified with a row inserted at the previous revision). Round-tripped up/down/up, `alembic check` clean.
+
 Gotcha learned: Alembic autogenerate does **not** detect CHECK constraints on existing tables — they were added to the
 migration by hand and verified in the live DB. The migration was round-tripped (up/down/up) on a scratch database.
 
@@ -217,7 +223,8 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Courses | `GET /courses?status=`, `POST /courses`, `GET/PATCH/DELETE /courses/{id}` (pause/resume/archive = `PATCH {status}`), `GET /courses/{id}/next`, `POST /courses/{id}/modules`, `POST /courses/{id}/bulk-lessons` | ✅ (tested + live) |
 | Modules / lessons | `PATCH/DELETE /modules/{id}`, `POST /modules/{id}/move`, `POST /modules/{id}/lessons`, `PATCH/DELETE /lessons/{id}`, `POST /lessons/{id}/move\|start\|complete\|uncomplete` (every one returns the whole updated course) | ✅ (tested + live) |
 | Course templates | `GET /course-templates`, `POST /course-templates/{key}` (409 if already added) | ✅ (tested + live) |
-| ByteByteGo | `GET /learning/bytebytego` (summary, next N videos, daily target) | ⏳ |
+| Video playlists | `GET/POST /video-playlists`, `GET/PATCH/DELETE /video-playlists/{id}` (summary: totals, floored percent, `watched_today`, `remaining_today`, `next_video`), `GET /video-playlists/{id}/today` (`up_next` = next `remaining_today` unwatched videos), `GET /video-playlists/{id}/videos?view=all\|open\|completed&q&limit&offset` → `{items,total}`, `POST /video-playlists/{id}/videos`, `POST /video-playlists/{id}/bulk-videos` (`{lines,category}` → `{added,duplicates,invalid}`) | ✅ (tested + live) |
+| Videos | `GET /videos/next` (first unwatched video across active playlists), `PATCH/DELETE /videos/{id}`, `POST /videos/{id}/start\|complete\|uncomplete\|move` | ✅ (tested + live) |
 | Learning sessions | `GET /learning-sessions?course_id&limit&offset`, `POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ✅ (tested + live) |
 | Roadmap | `GET /roadmap`, `POST /roadmap/topics`, `PATCH /roadmap/topics/{id}`, `GET /roadmap/next` | ⏳ |
 | Habits | `GET/POST /habits`, `PATCH/DELETE /habits/{id}`, `PUT /habits/{id}/logs/{date}`, `GET /habits/{id}/stats` | ⏳ |
@@ -260,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · ByteByteGo · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 5 (video playlists) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 6 (AI roadmap) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -392,10 +399,60 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   (TypeScript does not check hyphenated JSX attributes); (4) the Active tab said "No courses yet" when only a completed course existed.
 - Ops: the real `hub.db` was backed up (`backend/data/backups/`, git-ignored) before migrating.
 
+**Phase 3 — Milestone 5: video playlists and the ByteByteGo tracker (done, branch `feat/videos`)**
+- The owner chose nothing explicitly between "roadmap version only" and "plus playlists", so the recommended **A** was built:
+  ByteByteGo is one playlist among any number, each with a **daily watch target**. Route `/videos` (nav label "Videos").
+- Backend: `services/videos.py` (all rules), `routers/videos.py` (thin HTTP), `schemas/videos.py`; models `VideoPlaylist` and an extended `Video`.
+- **Recommendation rule lives in SQL**, not the UI: `_open_videos()` = `status != 'completed' ORDER BY position, id`. Everything that
+  recommends (`next_videos`, playlist `next_video`, `/today` `up_next`, `GET /videos/next`) goes through that one query. A completed
+  video comes back only after the owner explicitly reopens it (`uncomplete`). A "watching" video is still recommended (not finished).
+- **Completion is explicit.** Only `complete` sets it; the first completion time is kept on repeat calls; the DB CHECK
+  (`completed ⇔ completed_at`) refuses any other state; the API refuses to set `status` directly (unknown field → 422).
+- **Watched today** counts completions inside the user's *local* day (`local_day_bounds_utc`), tested across the Kolkata midnight
+  boundary (00:30 local counts, 23:30 the evening before does not). `remaining_today = max(target - watched, 0)`.
+- Adding videos: paste links one per line (`url`, `Title | url` or `Title - url`) or add one at a time. Only `http(s)` links are
+  accepted (`javascript:`/`data:` rejected). YouTube ids are extracted from watch / youtu.be / shorts / embed links and used to skip
+  duplicates (also enforced by a DB unique constraint). Titles are never fetched: without a title the line becomes
+  "YouTube video <id>". **Importing a whole YouTube playlist (needs a YouTube Data API key) is NOT built** — nothing is faked.
+- No ByteByteGo videos are seeded (none are invented). The empty state offers "Start a ByteByteGo playlist", which only pre-fills the
+  form (name, channel link, 1/day).
+- Deleting a playlist deletes its videos including watched history (cascade); the UI warns with the count. Playlist names are unique per
+  owner, case-insensitive.
+- Frontend: `api/videos.ts`, `pages/videos/VideosPage.tsx` (playlist tabs, progress, Today card with "Watched X of N today", To watch /
+  Watched / All views, search, start / complete / reopen, up/down reorder, edit, confirm-before-delete), `VideoForms.tsx` (playlist form,
+  video form, paste modal that shows added / duplicate / unreadable counts). Reordering is switched off while searching or viewing Watched.
+- Tests: backend **308** (105 new: 55 service-level with an injected clock, 50 HTTP-level incl. auth on all 16 endpoints, isolation
+  between users, validation); frontend **116** (27 new). **Mutation checks: the key recommendation filter removed → 9 backend tests
+  failed; 4/4 deliberate UI bugs caught** (swapped complete/reopen, reorder while searching, dropped `noopener`, delete without confirm).
+- **Real end-to-end run (23/23 checks), no mocks and no browser:** real uvicorn + throwaway SQLite over HTTP with a session cookie —
+  setup, playlist, paste (3 added / 1 duplicate / 2 rejected), complete → next video skips it, target met, reopen, rejected links and
+  direct status writes, logout locks the API; then the **server was stopped and restarted** and login, playlist, progress, completion
+  time and the recommendation were verified from the saved file. The browser UI itself was verified with Vitest + a fake API and the
+  production build only — **not** by driving a real browser this milestone (the earlier headless-Edge runs were scratch scripts).
+- Ops: the real `hub.db` was backed up (`backend/data/backups/hub-before-videos-*.db`, git-ignored) before migrating to `c3e6a9d4b2f8`.
+
+## 10a. Session handoff (read this first in a new session)
+
+Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
+
+- State: Milestone 5 (video playlists) committed on `feat/videos` and merged into `main` with `--no-ff`; both pushed to GitHub.
+  Done: auth, app shell, tasks, courses, video playlists. Real `hub.db` is migrated to `c3e6a9d4b2f8`.
+- Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
+  Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), **7 AI roadmap ← NEXT (= our Milestone 6)**,
+  8 habits, 9 projects, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/roadmap`; five stages with the owner's exact topic lists (Stage 1 Programming and Foundations … Stage 5
+  AI Engineering and Deployment) seeded as **not started**; topic status not_started/in_progress/completed, notes, study dates, minutes
+  spent, per-stage and overall progress computed from records, add new topics; `roadmap_stages`/`roadmap_topics` tables already exist.
+  Never auto-complete a topic.
+- Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
+  each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
+  come in Milestone 12 / Phase 6; never mark unfinished work as done.
+
 ## 11. Pending work
 
-**Requested by the owner (2026-11-23) — YouTube playlists with a daily watch target.** Folded into Milestone 5, which
-widens from "ByteByteGo videos" to **video playlists** (ByteByteGo becomes just one playlist). Design:
+**Requested by the owner (2026-11-23) — YouTube playlists with a daily watch target.** Built in Milestone 5 (see §10) except the
+parts marked below as still pending: importing a playlist link through the YouTube Data API (needs a free API key, asked for only when
+we build it), the dashboard reminder (Milestone 11) and reminder emails (Phase 5). Original design for reference:
 - New `video_playlists` table (name, source URL, optional YouTube playlist id, `daily_target`, active) and
   `videos.playlist_id` + `videos.youtube_video_id`. Reuses the existing rule: completed videos are never recommended again,
   enforced in the query (`status != 'completed' ORDER BY position`).
@@ -429,3 +486,8 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
   the next day belongs to the planner milestone (columns `carried_from_date`, `carry_count` already exist).
 - Timezone default `Asia/Kolkata` was assumed (setup form pre-fills the browser's timezone); profile editing is not built.
 - SQLite quirk: a running uvicorn holds `hub.db` open (WAL); stop it before deleting/replacing the file.
+- Videos: no YouTube playlist import (needs an API key), no title lookup from links, no drag-and-drop (up/down buttons), no "daily target
+  history" (only today's count is derived from completion times), and the dashboard/e-mail reminders are not built yet. The
+  `LearningResource`/`course_lessons.lesson_type='video'` idea from Phase 1 is superseded by the dedicated `videos` table.
+- Test tooling: the `/videos` page is covered by Vitest with a fake API; there is still no real-browser run in the repo (see the Edge-script
+  note above). Shell quoting: write multi-line files with the editor tool, not bash heredocs (one failed silently this milestone).

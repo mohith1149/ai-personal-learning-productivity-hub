@@ -1,6 +1,6 @@
 from datetime import date as DateT, datetime
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base, UTCDateTime
@@ -161,25 +161,55 @@ class LearningSession(IdMixin, OwnedMixin, TimestampMixin, Base):
     notes: Mapped[str | None] = mapped_column(Text)
 
 
+class VideoPlaylist(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """A named list of videos (e.g. "ByteByteGo") with a daily watch target."""
+
+    __tablename__ = "video_playlists"
+    __table_args__ = (
+        CheckConstraint("daily_target BETWEEN 1 AND 50", name="daily_target"),
+        UniqueConstraint("user_id", "name", name="uq_video_playlists_user_name"),
+    )
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    youtube_playlist_id: Mapped[str | None] = mapped_column(String(64))
+    description: Mapped[str | None] = mapped_column(Text)
+    daily_target: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    videos: Mapped[list["Video"]] = relationship(
+        back_populates="playlist", cascade="all, delete-orphan", order_by="Video.position"
+    )
+
+
 class Video(IdMixin, OwnedMixin, TimestampMixin, Base):
-    """ByteByteGo (or any) video. Completion is recorded only by explicit user action."""
+    """A video in a playlist. Completion is recorded only by explicit user action."""
 
     __tablename__ = "videos"
     __table_args__ = (
         CheckConstraint(in_values("status", VIDEO_STATUSES), name="status"),
         # The next-video recommendation query is driven by this index.
         Index("ix_videos_user_status_pos", "user_id", "status", "position"),
+        Index("ix_videos_playlist_status_pos", "playlist_id", "status", "position"),
         # completed <=> completed_at is set (keeps the history honest)
         CheckConstraint(
             "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"
         ),
+        # The same YouTube video cannot be added twice to one playlist (NULL ids are exempt).
+        UniqueConstraint("playlist_id", "youtube_video_id", name="uq_videos_playlist_youtube"),
     )
 
+    playlist_id: Mapped[int] = mapped_column(
+        ForeignKey("video_playlists.id", ondelete="CASCADE"), nullable=False
+    )
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     url: Mapped[str | None] = mapped_column(String(500))
+    youtube_video_id: Mapped[str | None] = mapped_column(String(20))
     description: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(12), default="unwatched", nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     notes: Mapped[str | None] = mapped_column(Text)
+
+    playlist: Mapped[VideoPlaylist] = relationship(back_populates="videos")

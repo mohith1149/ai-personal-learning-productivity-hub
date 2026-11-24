@@ -6,6 +6,7 @@ import { LoginPage, SetupPage } from "./pages/AuthPages";
 import { CourseDetailPage } from "./pages/courses/CourseDetailPage";
 import { CoursesPage } from "./pages/courses/CoursesPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
+import { VideosPage } from "./pages/videos/VideosPage";
 import { ComingSoonPage, DashboardPage, NotFoundPage, SettingsPage } from "./pages/ShellPages";
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="tasks" element={<TasksPage />} />
         <Route path="courses" element={<CoursesPage />} />
         <Route path="courses/:courseId" element={<CourseDetailPage />} />
+        <Route path="videos" element={<VideosPage />} />
         <Route path="settings" element={<SettingsPage />} />
         {/* Signed-in users who visit /login or /setup land on the dashboard. */}
         <Route path="login" element={<Navigate to="/" replace />} />
