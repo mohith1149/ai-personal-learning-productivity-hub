@@ -226,7 +226,7 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Video playlists | `GET/POST /video-playlists`, `GET/PATCH/DELETE /video-playlists/{id}` (summary: totals, floored percent, `watched_today`, `remaining_today`, `next_video`), `GET /video-playlists/{id}/today` (`up_next` = next `remaining_today` unwatched videos), `GET /video-playlists/{id}/videos?view=all\|open\|completed&q&limit&offset` → `{items,total}`, `POST /video-playlists/{id}/videos`, `POST /video-playlists/{id}/bulk-videos` (`{lines,category}` → `{added,duplicates,invalid}`) | ✅ (tested + live) |
 | Videos | `GET /videos/next` (first unwatched video across active playlists), `PATCH/DELETE /videos/{id}`, `POST /videos/{id}/start\|complete\|uncomplete\|move` | ✅ (tested + live) |
 | Learning sessions | `GET /learning-sessions?course_id&limit&offset`, `POST /learning-sessions`, `DELETE /learning-sessions/{id}` | ✅ (tested + live) |
-| Roadmap | `GET /roadmap`, `POST /roadmap/topics`, `PATCH /roadmap/topics/{id}`, `GET /roadmap/next` | ⏳ |
+| Roadmap | `GET /roadmap`, `POST /roadmap/topics`, `PATCH/DELETE /roadmap/topics/{id}`, `POST /roadmap/topics/{id}/status`, `GET/POST /roadmap/topics/{id}/study` | ✅ (tested) |
 | Habits | `GET/POST /habits`, `PATCH/DELETE /habits/{id}`, `PUT /habits/{id}/logs/{date}`, `GET /habits/{id}/stats` | ⏳ |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, milestones `POST /projects/{id}/milestones`, `PATCH/DELETE /milestones/{id}` | ⏳ |
 | Project ideas | `GET/POST /project-ideas`, `PATCH/DELETE /project-ideas/{id}`, `POST /project-ideas/{id}/start`, `GET /project-ideas/recommend` | ⏳ |
@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 6 (AI roadmap) next |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 milestone 7 (habits) next |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -451,19 +451,31 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   collection the "Watch next" card follows that collection's order. Backup before: `backend/data/backups/hub-before-plan-*.db`.
 - Not built: Google Takeout watch-history import; thumbnails are hot-linked from YouTube.
 
+**Milestone 6: AI Engineering roadmap (done, branch `feat/roadmap`)**
+- Route `/roadmap` ("AI roadmap"). The owner's five stages and their exact topic lists (51 topics: 8/9/11/11/12) are created for a user **once, on first open**
+  (`services/roadmap.ensure_seeded`), all "not started"; nothing is ever auto-completed. Stage descriptions are empty (nothing invented).
+- Migration `e5a8c2d1f4b6`: unique stage title per user, unique topic title per stage, CHECK `(status='completed') = (completed_at IS NOT NULL)`.
+  (`roadmap_topics.minutes_spent/last_studied_at/completion_pct` columns exist but are unused: study data is derived.)
+- Endpoints: `GET /roadmap` (stages + topics + per-stage and overall progress + `next_topic`), `POST /roadmap/topics`, `PATCH/DELETE /roadmap/topics/{id}`
+  (PATCH cannot change status), `POST /roadmap/topics/{id}/status` (the ONLY way to complete), `GET/POST /roadmap/topics/{id}/study`; deleting a study entry uses the
+  existing `DELETE /learning-sessions/{id}`.
+- Study time/dates = real `learning_sessions` rows with `roadmap_topic_id`; minutes, study days and last-studied date are always computed from them. Logging time on a
+  not-started topic moves it to in progress (never completed). Progress = floor(completed/total), per stage and overall (over all topics, not an average of stages).
+  `next_topic` = first non-completed topic in roadmap order. Deleting a topic keeps its logged study history.
+- Frontend: `pages/roadmap/RoadmapPage.tsx`, `api/roadmap.ts`; tests `roadmap.test.tsx` (12) + `fakeRoadmap.ts`; backend `test_roadmap.py`, `test_roadmap_api.py` (33).
+- Not built here: roadmap-based daily suggestions (Milestone 9/10), reordering topics, stage CRUD (only topics can be added).
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-6 done (auth, shell, tasks, courses, videos+YouTube, **AI roadmap**). Real `hub.db` at migration `e5a8c2d1f4b6`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
-  Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), **7 AI roadmap ← NEXT (= our Milestone 6)**,
-  8 habits, 9 projects, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/roadmap`; five stages with the owner's exact topic lists (Stage 1 Programming and Foundations … Stage 5
-  AI Engineering and Deployment) seeded as **not started**; topic status not_started/in_progress/completed, notes, study dates, minutes
-  spent, per-stage and overall progress computed from records, add new topics; `roadmap_stages`/`roadmap_topics` tables already exist.
-  Never auto-complete a topic.
+  Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
+  **8 habits ← NEXT (= our Milestone 7)**, 9 projects, 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/habits`; customizable habits (name, description, frequency, target, start date, active flag, daily completion records, notes),
+  CRUD, daily completion, history, weekly/monthly progress, and streaks computed from the completion records (never hardcoded). Owner spec section 9.
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.
