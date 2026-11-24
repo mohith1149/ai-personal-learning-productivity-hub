@@ -13,7 +13,8 @@ import { ProjectsPage } from "./pages/projects/ProjectsPage";
 import { RoadmapPage } from "./pages/roadmap/RoadmapPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
 import { VideosPage } from "./pages/videos/VideosPage";
-import { ComingSoonPage, DashboardPage, NotFoundPage, SettingsPage } from "./pages/ShellPages";
+import { DashboardPage } from "./pages/dashboard/DashboardPage";
+import { ComingSoonPage, NotFoundPage, SettingsPage } from "./pages/ShellPages";
 
 function FullScreenMessage({ children }: { children: React.ReactNode }) {
   return (

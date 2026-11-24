@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { NAV_GROUPS } from "../nav";
 import { ThemeProvider } from "../theme";
+import { emptyDashboard } from "./fakeDashboard";
 import { setSystemDark } from "./systemTheme";
 
 const USER = { id: 1, email: "me@example.com", display_name: "Ada Lovelace", timezone: "Asia/Kolkata" };
@@ -14,7 +15,7 @@ type Auth = { setup_required: boolean; authenticated: boolean; user: typeof USER
 let auth: Auth;
 let calls: { url: string; method: string }[];
 
-/** Fake backend: only /api/auth/* exists at this milestone. Anything else is a test failure. */
+/** Fake backend: only /api/auth/* and an empty /api/dashboard are needed here. Anything else is a test failure. */
 function installFakeBackend() {
   calls = [];
   vi.stubGlobal(
@@ -23,6 +24,7 @@ function installFakeBackend() {
       const method = init?.method ?? "GET";
       calls.push({ url, method });
       if (url === "/api/auth/status") return Response.json(auth);
+      if (url === "/api/dashboard") return Response.json(emptyDashboard()); // a brand-new account
       if (url === "/api/auth/logout" && method === "POST") {
         auth = { setup_required: false, authenticated: false, user: null };
         return new Response(null, { status: 204 });
@@ -112,10 +114,10 @@ describe("navigation", () => {
 });
 
 describe("dashboard", () => {
-  it("greets the user by name and invents no numbers", async () => {
+  it("greets the user by name and, for a new account, invents no numbers", async () => {
     renderAt("/");
     expect(await screen.findByRole("heading", { name: /Good (morning|afternoon|evening), Ada Lovelace/ })).toBeInTheDocument();
-    expect(screen.getByText("Nothing to show yet")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing to show yet")).toBeInTheDocument();
     // The main area must contain no digits at all until real metrics exist.
     expect(document.getElementById("main")!.textContent).not.toMatch(/\d/);
   });

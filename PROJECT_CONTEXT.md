@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: dashboard with real metrics (milestone 11) |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: AI foundation (milestone 12) |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -528,17 +528,28 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Not built: GitHub verification (Phase 4), editing evidence after completion, linking `tasks.challenge_id`, `project_ideas` backlog, reminder emails (Phase 5).
 - Gotcha: run vitest from PowerShell with the `D:\` path; from Git bash (`/d/...`) every test file fails with "Vitest failed to find the current suite".
 
+**Milestone 11: Dashboard (done, branch `feat/dashboard`)**
+- Route `/` (replaces the empty placeholder). NO migration, nothing stored: `GET /api/dashboard` (`services/dashboard.build`) composes the other features' own services on each
+  request, so it can't disagree with them: today's plan summary + next 6 open items (planner), videos to watch today (per active collection with a daily target and something left
+  to watch: watched X of N + the titles still to watch), challenge status + streaks (challenges), habits (due today, best current streak), tasks (overdue / due today / completed today),
+  active projects (<=5, least recently worked first, progress + time), active courses (progress + next lesson), roadmap (completed/total, next topic), last 7 days of study vs project minutes.
+- `is_empty` (no tasks, courses, projects, collections, habits or challenge records) shows an honest empty state with links instead of zeros. The roadmap is seeded first (as the
+  roadmap page does), so a new account's plan lists its first roadmap topic; a test caught the dashboard and planner disagreeing before this ordering fix.
+- Tests: backend `test_dashboard.py` (7); frontend `dashboard.test.tsx` (13) + `fakeDashboard.ts` (the default fake API serves an empty dashboard; `shell.test.tsx` has its own handler).
+- Not built: weekly/monthly charts, per-day challenge strip, dashboard reminders by email (Phase 5).
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-10 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, daily planner, **daily AI project challenge**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-11 done (11 = dashboard) (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, daily planner, **daily AI project challenge**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); **Milestone 11 dashboard ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/dashboard`; Milestone 11 dashboard with REAL metrics computed from existing services (today's plan summary, streaks, challenge status, videos to watch today,
-  project progress, roadmap progress), empty states with no invented data. Then Milestone 12 AI foundation (provider abstraction, tool calling, approvals, memory), integration tests/docs, final verification.
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); Milestone 11 dashboard ✅; **Milestone 12 AI foundation ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/ai-foundation`; Milestone 12: provider abstraction (Claude/OpenAI/Gemini interface, none connected yet), tool-calling layer where the LLM only calls
+  service functions (never the DB), read tools immediate / write tools create pending actions needing approval, memory. No live provider is claimed until implemented and tested.
+  Then integration tests, docs, final verification.
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.
