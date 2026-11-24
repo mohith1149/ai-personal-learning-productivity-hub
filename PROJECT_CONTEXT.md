@@ -230,7 +230,7 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Habits | `GET/POST /habits`, `GET/PATCH/DELETE /habits/{id}`, `PUT/DELETE /habits/{id}/logs/{date}`, `GET /habits/{id}/logs` | ✅ (tested) |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, milestones `POST /projects/{id}/milestones`, `PATCH/DELETE /milestones/{id}` | ⏳ |
 | Project ideas | `GET/POST /project-ideas`, `PATCH/DELETE /project-ideas/{id}`, `POST /project-ideas/{id}/start`, `GET /project-ideas/recommend` | ⏳ |
-| Daily challenge | `GET /challenges/today`, `POST /challenges`, `PATCH /challenges/{id}`, `POST /challenges/{id}/complete`, `/excuse`, `GET /challenges/calendar?start&end` | ⏳ |
+| Daily challenge | `GET /challenges/today`, `POST /challenges`, `PATCH /challenges/{id}`, `POST /challenges/{id}/complete`, `/excuse`, `GET /challenges/calendar?start&end` | ✅ |
 | GitHub | `GET /github/status`, `GET /github/oauth/start`, `GET /github/oauth/callback`, `POST /github/token`, `POST /github/disconnect`, `POST /github/sync`, `GET /github/repos`, `GET /github/repos/{id}/commits`, `POST /github/verify-commit` | ⏳ |
 | Check-in/out | `GET/PUT /checkins/{date}`, `GET/PUT /checkouts/{date}` | ⏳ |
 | Notifications | `GET /notifications`, `POST /notifications/test`, `GET /notifications/preview/daily-plan`, `POST /notifications/run/{type}` | ⏳ |
@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: daily challenge (milestone 9) |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: dashboard with real metrics (milestone 11) |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -508,18 +508,37 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Tests: backend `test_planner.py` (47), `test_planner_api.py` (18); frontend `planner.test.tsx` (16) + `fakePlanner.ts`.
 - Not built: weekly view, drag-to-reorder, planner reminders (Phase 5), the dashboard "today" widget (Milestone 11).
 
+**Milestone 9: Daily AI project challenge (done, branch `feat/challenge`)**
+- Route `/challenge`. NO migration: the `daily_challenges` table (with its CHECKs) already existed. Endpoints: `GET /challenges/today` (today's challenge + stats + suggestions),
+  `GET /challenges/calendar?start&end` (default last 30 days, max 400), `GET /challenges/history`, `POST /challenges` (plan), `GET/PATCH/DELETE /challenges/{id}`,
+  `POST /challenges/{id}/start|complete`, `POST /challenges/excuse` (`{date?, reason}`).
+- Plan: one per day; today or future only; mode `existing_project` (an ACTIVE project) or `new_project` (creates the project through the projects service, origin "new").
+- Complete (today only) needs: summary >= 30 chars with >= 5 words / 4 distinct (and not a copy of the commit message), a GitHub repo URL, commit hash (7-40 hex), a meaningful
+  commit message (junk like "update", "wip", "fix", "initial commit", repeated words rejected), minutes. The repo must match the project's repo if it has one (otherwise the project
+  adopts it). The same commit (short or long form) can't count for two days. Optional milestone must belong to the project (linked, never auto-completed).
+  Completing also logs a normal `project_sessions` row, so project time/planner dev minutes agree. Stored as `verification_status='unverified'`.
+- **HONEST LIMIT**: nothing is checked against GitHub, so an empty/fake commit can't be detected yet. That is Phase 4 (GitHub verification flips `verification_status`).
+- `missed` is NEVER stored: a planned/in-progress day that has passed, or a past day with no record (after the first record), is computed as missed. Excusing needs a reason (>= 5 chars),
+  works for today or any past day (creates a row if none), never the future; a completed day can't be excused or deleted. Deleting an excused/planned row removes the excuse/plan.
+- Streaks/totals computed (`streaks()` pure function): completed days count, excused days are skipped (neither add nor break), today not yet done doesn't break the streak.
+  Completion rate = completed / (completed + missed), floored.
+- Suggestions (no AI): active projects (least recently worked first, with next milestone / open task), next roadmap topic, next lesson of active courses, last challenge's project.
+- Tests: backend `test_challenges.py` (64), `test_challenges_api.py` (35); frontend `challenge.test.tsx` (16) + `fakeChallenges.ts`. Shell placeholder test now uses `/assistant`.
+- A bug the HTTP tests caught: an unknown project id raised a 500; now 404.
+- Not built: GitHub verification (Phase 4), editing evidence after completion, linking `tasks.challenge_id`, `project_ideas` backlog, reminder emails (Phase 5).
+- Gotcha: run vitest from PowerShell with the `D:\` path; from Git bash (`/d/...`) every test file fails with "Vitest failed to find the current suite".
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-8 + 10 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, **daily planner**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-10 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, daily planner, **daily AI project challenge**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; **Milestone 9 daily challenge ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/challenge`; daily AI project challenge (owner spec section 12): one primary project challenge per calendar day (new or existing project), daily
-  task suggestions from roadmap/courses/projects, evidence (summary, commit hash + message, repo URL, time), accountability status; a day can't be completed without evidence; empty/meaningless
-  commits don't count; excused days need a reason; evidence stays 'unverified' until GitHub verification (Phase 4). `daily_challenges` table already exists. Then dashboard (Milestone 11).
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; Milestone 9 daily challenge ✅ (built after the planner); **Milestone 11 dashboard ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/dashboard`; Milestone 11 dashboard with REAL metrics computed from existing services (today's plan summary, streaks, challenge status, videos to watch today,
+  project progress, roadmap progress), empty states with no invented data. Then Milestone 12 AI foundation (provider abstraction, tool calling, approvals, memory), integration tests/docs, final verification.
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.

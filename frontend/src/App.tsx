@@ -6,6 +6,7 @@ import { LoginPage, SetupPage } from "./pages/AuthPages";
 import { CourseDetailPage } from "./pages/courses/CourseDetailPage";
 import { CoursesPage } from "./pages/courses/CoursesPage";
 import { HabitsPage } from "./pages/habits/HabitsPage";
+import { ChallengePage } from "./pages/challenge/ChallengePage";
 import { PlannerPage } from "./pages/planner/PlannerPage";
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage";
 import { ProjectsPage } from "./pages/projects/ProjectsPage";
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="roadmap" element={<RoadmapPage />} />
         <Route path="habits" element={<HabitsPage />} />
         <Route path="planner" element={<PlannerPage />} />
+        <Route path="challenge" element={<ChallengePage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />
