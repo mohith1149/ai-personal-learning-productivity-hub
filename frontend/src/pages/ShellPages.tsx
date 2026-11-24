@@ -1,25 +1,7 @@
-import { Hammer } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuthStatus } from "../api/auth";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { Button, Card, EmptyState, PageHeader } from "../components/ui";
-import { ALL_NAV_ITEMS } from "../nav";
-
-/** Honest placeholder for routes whose feature has not been built yet. */
-export function ComingSoonPage() {
-  const { pathname } = useLocation();
-  const item = ALL_NAV_ITEMS.find((i) => i.to === pathname);
-  if (!item) return <NotFoundPage />;
-  return (
-    <>
-      <PageHeader title={item.label} />
-      <EmptyState icon={Hammer} title="Not built yet">
-        {item.blurb}
-        {item.milestone && <span className="mt-2 block font-medium text-slate-600 dark:text-slate-300">Planned: {item.milestone}</span>}
-      </EmptyState>
-    </>
-  );
-}
 
 export function SettingsPage() {
   const user = useAuthStatus().data?.user;

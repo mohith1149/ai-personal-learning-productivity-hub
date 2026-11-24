@@ -93,13 +93,6 @@ describe("navigation", () => {
     expect(within(nav).getByRole("link", { name: /Tasks/ })).not.toHaveAttribute("aria-current");
   });
 
-  it("renders an honest placeholder for an unbuilt feature (no fake data)", async () => {
-    renderAt("/assistant");
-    expect(await screen.findByRole("heading", { name: "AI assistant" })).toBeInTheDocument();
-    expect(screen.getByText("Not built yet")).toBeInTheDocument();
-    expect(screen.getByText(/Planned: Milestone 12/)).toBeInTheDocument();
-  });
-
   it("shows a 404 page for unknown addresses", async () => {
     renderAt("/does-not-exist");
     expect(await screen.findByText("Page not found")).toBeInTheDocument();
