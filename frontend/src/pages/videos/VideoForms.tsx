@@ -149,7 +149,7 @@ export function VideoForm({ playlistId, video, onClose }: { playlistId: number; 
           placeholder="https://youtu.be/…"
           value={f.url}
           onChange={(e) => setF({ ...f, url: e.target.value })}
-          hint="Must start with http:// or https://"
+          hint={'A single video link. For a playlist or channel use "Import from YouTube".'}
         />
         <TextInput label="Category" placeholder="e.g. System design" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} maxLength={80} />
         <TextArea label="Description or topic" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
@@ -213,7 +213,7 @@ export function PasteVideosModal({ playlistId, onClose }: { playlistId: number; 
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={"https://youtu.be/…\nHow DNS works | https://www.youtube.com/watch?v=…"}
-            hint='Each line is a link, or "Title | link". Without a title one is generated from the link. Videos you already added are skipped.'
+            hint='Each line is a link, or "Title | link". Without a title one is generated from the link. Videos you already added are skipped. To fetch a whole playlist or channel, use "Import from YouTube" instead.'
           />
           <TextInput label="Category for all of these (optional)" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={80} />
           <FormError message={bulk.error?.message} />
