@@ -95,6 +95,7 @@ class CourseLesson(IdMixin, TimestampMixin, Base):
 
 class RoadmapStage(IdMixin, OwnedMixin, TimestampMixin, Base):
     __tablename__ = "roadmap_stages"
+    __table_args__ = (UniqueConstraint("user_id", "title", name="uq_roadmap_stages_user_title"),)
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -110,6 +111,9 @@ class RoadmapTopic(IdMixin, OwnedMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(in_values("status", TOPIC_STATUSES), name="status"),
         CheckConstraint("completion_pct BETWEEN 0 AND 100", name="completion_pct"),
+        # completed <=> completed_at is set: a topic is only ever completed by an explicit action
+        CheckConstraint("(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"),
+        UniqueConstraint("stage_id", "title", name="uq_roadmap_topics_stage_title"),
         Index("ix_topics_stage_pos", "stage_id", "position"),
     )
 
@@ -123,7 +127,7 @@ class RoadmapTopic(IdMixin, OwnedMixin, TimestampMixin, Base):
     completion_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     exercises: Mapped[str | None] = mapped_column(Text)
     project_applications: Mapped[str | None] = mapped_column(Text)
-    minutes_spent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    minutes_spent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # unused: derived from learning_sessions
     notes: Mapped[str | None] = mapped_column(Text)
     last_studied_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
