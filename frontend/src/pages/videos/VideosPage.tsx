@@ -64,19 +64,20 @@ function Overview({ stats }: { stats: LibraryStats }) {
   );
 }
 
-function UpNext({ timeZone }: { timeZone: string }) {
+/** Next video to watch: the selected collection's own order when one is open, else the whole library by publish date. */
+function UpNext({ timeZone, playlist }: { timeZone: string; playlist?: Playlist }) {
   const [order, setOrder] = useState<"oldest" | "newest">("oldest");
   const stats = useLibraryStats(order);
   const action = useVideoAction();
-  const v = stats.data?.next_video;
+  const v = playlist ? playlist.next_video : stats.data?.next_video;
   return (
     <Card aria-label="Recommended next video">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Watch next</h2>
-        <select aria-label="Recommendation order" value={order} onChange={(e) => setOrder(e.target.value as "oldest" | "newest")} className={cx("w-44 py-1 text-xs", controlClass)}>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{playlist ? `Watch next in ${playlist.name}` : "Watch next"}</h2>
+        {!playlist && <select aria-label="Recommendation order" value={order} onChange={(e) => setOrder(e.target.value as "oldest" | "newest")} className={cx("w-44 py-1 text-xs", controlClass)}>
           <option value="oldest">Oldest published first</option>
           <option value="newest">Newest published first</option>
-        </select>
+        </select>}
       </div>
       {stats.isError ? (
         <ErrorNotice error={stats.error} onRetry={() => stats.refetch()} />
@@ -434,7 +435,7 @@ export function VideosPage() {
           {stats.data && (
             <div className="mb-4 grid gap-4 lg:grid-cols-2">
               <Overview stats={stats.data} />
-              <UpNext timeZone={timeZone} />
+              <UpNext timeZone={timeZone} playlist={selected} />
             </div>
           )}
 
