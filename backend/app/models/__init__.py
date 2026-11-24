@@ -10,6 +10,7 @@ from app.models.daily import (  # noqa: F401
     WeeklyReport,
 )
 from app.models.habit import Habit, HabitLog  # noqa: F401
+from app.models.planner import PlannerExcusal  # noqa: F401
 from app.models.learning import (  # noqa: F401
     Course,
     CourseLesson,
