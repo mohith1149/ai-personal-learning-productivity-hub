@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routers import auth, courses, roadmap, tasks, videos, youtube
+from app.routers import auth, courses, habits, roadmap, tasks, videos, youtube
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -16,3 +16,4 @@ api_router.include_router(videos.playlists_router)
 api_router.include_router(videos.videos_router)
 api_router.include_router(youtube.router)
 api_router.include_router(roadmap.router)
+api_router.include_router(habits.router)
