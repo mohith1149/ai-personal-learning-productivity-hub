@@ -5,7 +5,7 @@ Flow (nothing is saved until the user confirms):
   2. `import_selected` - the user ticks videos; the server re-reads THOSE videos from YouTube (it never trusts titles,
      dates or counts sent by the browser), then links them into the channel/playlist collection.
 """
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import User, Video, VideoPlaylist
@@ -53,10 +53,19 @@ def _collection_for(db: Session, user: User, info: SourceInfo) -> VideoPlaylist:
         match = (VideoPlaylist.kind == "playlist", VideoPlaylist.youtube_playlist_id == info.id)
     p = db.scalar(select(VideoPlaylist).where(VideoPlaylist.user_id == user.id, *match))
     if p is None:
+        # A hand-made collection with the same name (e.g. a "ByteByteGo" list started before importing existed) is
+        # ADOPTED: it becomes the YouTube collection and keeps its videos and daily target. Imported collections
+        # recommend oldest-published first.
+        p = db.scalar(select(VideoPlaylist).where(
+            VideoPlaylist.user_id == user.id, VideoPlaylist.kind == "collection",
+            func.lower(VideoPlaylist.name) == info.title.lower()))
+        if p is not None:
+            p.kind, p.recommend_order = info.kind, "oldest"
+    if p is None:
         name, n = info.title[:120], 1
-        while lib._name_taken(db, user, name):  # a hand-made collection may already use the title
+        while lib._name_taken(db, user, name):  # a differently-typed collection already uses the title
             n += 1
-            suffix = f" (YouTube)" if n == 2 else f" (YouTube {n - 1})"
+            suffix = " (YouTube)" if n == 2 else f" (YouTube {n - 1})"
             name = info.title[: 120 - len(suffix)] + suffix
         p = VideoPlaylist(user_id=user.id, name=name, kind=info.kind, recommend_order="oldest", daily_target=1)
         db.add(p)

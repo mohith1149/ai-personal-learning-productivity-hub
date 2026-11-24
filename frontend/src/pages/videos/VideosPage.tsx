@@ -1,68 +1,129 @@
-import { Check, ChevronDown, ChevronUp, ClipboardPaste, ExternalLink, Pencil, Play, Plus, Search, Trash2, CirclePlay } from "lucide-react";
+import { Check, ClipboardPaste, CirclePlay, Download, ExternalLink, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuthStatus } from "../../api/auth";
 import {
+  STATUS_LABEL,
   useDeletePlaylist,
-  useDeleteVideo,
-  useMoveVideo,
+  useLibraryStats,
   usePlaylists,
   useToday,
   useVideoAction,
   useVideos,
+  type LibraryStats,
   type Playlist,
   type Video,
-  type VideoView,
+  type VideoFilters,
+  type VideoSort,
+  type VideoStatus,
 } from "../../api/videos";
 import { controlClass } from "../../components/forms";
 import { ConfirmDialog } from "../../components/Modal";
-import { Badge, Button, Card, EmptyState, ErrorNotice, PageHeader, ProgressBar, Spinner, StatusBadge, cx } from "../../components/ui";
-import { formatDay, todayIn } from "../../lib/dates";
-import { BYTEBYTEGO_PRESET, PasteVideosModal, PlaylistForm, VideoForm } from "./VideoForms";
+import { Badge, Button, Card, EmptyState, ErrorNotice, PageHeader, ProgressBar, Spinner, cx } from "../../components/ui";
+import { countOrUnavailable, formatDate } from "../../lib/format";
+import { ImportModal } from "./ImportModal";
+import { Thumbnail, VideoCard } from "./VideoCard";
+import { PasteVideosModal, PlaylistForm, VideoForm } from "./VideoForms";
 
-const VIEWS: { key: VideoView; label: string }[] = [
-  { key: "open", label: "To watch" },
-  { key: "completed", label: "Watched" },
-  { key: "all", label: "All" },
+const SORTS: { key: VideoSort; label: string }[] = [
+  { key: "recommended", label: "Recommended order" },
+  { key: "newest", label: "Newest first" },
+  { key: "oldest", label: "Oldest first" },
+  { key: "completed", label: "Recently completed" },
+  { key: "added", label: "Recently added" },
 ];
 
-function IconButton({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={cx(
-        "rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-800",
-        danger ? "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40" : "hover:text-slate-800 dark:hover:text-slate-200",
+    <div>
+      <dt className="text-xs text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className="text-lg font-semibold tabular-nums text-slate-900 dark:text-white">{value}</dd>
+    </div>
+  );
+}
+
+/* ---------------------------------- overall + recommendation ---------------------------------- */
+
+function Overview({ stats }: { stats: LibraryStats }) {
+  return (
+    <Card aria-label="Overall progress">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Overall progress</h2>
+        <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300">{stats.percent}%</span>
+      </div>
+      <div className="mt-2">
+        <ProgressBar percent={stats.percent} label="Overall progress" />
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="In library" value={stats.total} />
+        <Stat label="Completed" value={stats.completed} />
+        <Stat label="In progress" value={stats.in_progress} />
+        <Stat label="Not started" value={stats.unwatched} />
+      </dl>
+    </Card>
+  );
+}
+
+function UpNext({ timeZone }: { timeZone: string }) {
+  const [order, setOrder] = useState<"oldest" | "newest">("oldest");
+  const stats = useLibraryStats(order);
+  const action = useVideoAction();
+  const v = stats.data?.next_video;
+  return (
+    <Card aria-label="Recommended next video">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Watch next</h2>
+        <select aria-label="Recommendation order" value={order} onChange={(e) => setOrder(e.target.value as "oldest" | "newest")} className={cx("w-44 py-1 text-xs", controlClass)}>
+          <option value="oldest">Oldest published first</option>
+          <option value="newest">Newest published first</option>
+        </select>
+      </div>
+      {stats.isError ? (
+        <ErrorNotice error={stats.error} onRetry={() => stats.refetch()} />
+      ) : !stats.data ? (
+        <Spinner label="Finding your next video…" />
+      ) : !v ? (
+        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+          {stats.data.total === 0 ? "Import or add videos to get a recommendation." : "Nothing left to watch. Every video in your library is completed."}
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-4">
+          <Thumbnail video={v} className="w-44 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 text-sm font-semibold text-slate-900 dark:text-white">{v.title}</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {formatDate(v.published_at, timeZone) ? `Published ${formatDate(v.published_at, timeZone)}` : "No publish date"}
+              {v.channel_title && <> · {v.channel_title}</>}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {v.url && (
+                <a
+                  href={v.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label={`Watch ${v.title} next`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Watch <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </a>
+              )}
+              <Button icon={Check} loading={action.isPending} onClick={() => action.mutate({ id: v.id, action: "complete" })} aria-label={`Mark ${v.title} as completed (next)`}>
+                Mark completed
+              </Button>
+            </div>
+            {action.error && (
+              <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                {action.error.message}
+              </p>
+            )}
+          </div>
+        </div>
       )}
-    >
-      {children}
-    </button>
+    </Card>
   );
 }
 
-function OpenLink({ video }: { video: Video }) {
-  if (!video.url) return null;
-  return (
-    <a
-      href={video.url}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline dark:text-brand-400"
-      aria-label={`Open ${video.title}`}
-    >
-      Open <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-    </a>
-  );
-}
-
-function VideoStatusBadge({ status }: { status: Video["status"] }) {
-  return <StatusBadge status={status === "completed" ? "completed" : status === "watching" ? "in_progress" : "not_started"} />;
-}
-
-/* ---------------------------------- today ---------------------------------- */
+/* ---------------------------------- today (daily target) ---------------------------------- */
 
 function TodayCard({ playlist }: { playlist: Playlist }) {
   const today = useToday(playlist.id);
@@ -96,24 +157,31 @@ function TodayCard({ playlist }: { playlist: Playlist }) {
         </p>
       ) : t.up_next.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          {playlist.total_videos === 0 ? "Add videos to get a daily list." : "Every video in this playlist is watched."}
+          {playlist.total_videos === 0 ? "Add videos to get a daily list." : "Every video in this playlist is completed."}
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800" aria-label="Up next today">
           {t.up_next.map((v) => (
             <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{v.title}</p>
-                {v.category && <p className="text-xs text-slate-500 dark:text-slate-400">{v.category}</p>}
-              </div>
+              <p className="min-w-0 truncate text-sm font-medium text-slate-900 dark:text-white">{v.title}</p>
               <div className="flex items-center gap-3">
-                <OpenLink video={v} />
+                {v.url && (
+                  <a
+                    href={v.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label={`Open ${v.title}`}
+                    className="inline-flex items-center gap-1 text-sm text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    Open <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </a>
+                )}
                 <Button
                   icon={Check}
                   variant="secondary"
                   loading={action.isPending && action.variables?.id === v.id}
                   onClick={() => action.mutate({ id: v.id, action: "complete" })}
-                  aria-label={`Mark ${v.title} as watched`}
+                  aria-label={`Mark ${v.title} as watched today`}
                 >
                   Watched
                 </Button>
@@ -131,98 +199,19 @@ function TodayCard({ playlist }: { playlist: Playlist }) {
   );
 }
 
-/* ---------------------------------- list ---------------------------------- */
+/* ---------------------------------- collection overview ---------------------------------- */
 
-type Confirm = { kind: "video"; video: Video } | { kind: "playlist" };
-
-function VideoRow({ video, first, last, timeZone, today, onEdit, onDelete }: {
-  video: Video; first: boolean; last: boolean; timeZone: string; today: string; onEdit: () => void; onDelete: () => void;
-}) {
-  const action = useVideoAction();
-  const move = useMoveVideo();
-  const done = video.status === "completed";
-  const busy = action.isPending || move.isPending;
-  const watchedOn = video.completed_at ? formatDay(todayIn(timeZone, new Date(video.completed_at)), today) : null;
-
+function CollectionOverview({ playlist, onEdit, onDelete }: { playlist: Playlist; onEdit: () => void; onDelete: () => void }) {
+  const imported = playlist.kind !== "collection";
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
-      <button
-        onClick={() => action.mutate({ id: video.id, action: done ? "uncomplete" : "complete" })}
-        disabled={busy}
-        role="checkbox"
-        aria-checked={done}
-        aria-label={done ? `Reopen ${video.title}` : `Mark ${video.title} as watched`}
-        className={cx(
-          "flex h-5 w-5 shrink-0 items-center justify-center rounded border transition disabled:opacity-50",
-          done ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 hover:border-brand-500 dark:border-slate-600",
-        )}
-      >
-        {done && <Check className="h-3.5 w-3.5" aria-hidden />}
-      </button>
-      <div className="min-w-0 flex-1">
-        <p className={cx("truncate text-sm font-medium", done ? "text-slate-500 line-through dark:text-slate-500" : "text-slate-900 dark:text-white")}>
-          {video.title}
-        </p>
-        <p className="flex flex-wrap gap-x-3 text-xs text-slate-500 dark:text-slate-400">
-          {video.category && <span>{video.category}</span>}
-          {watchedOn && <span>Watched {watchedOn}</span>}
-          {video.notes && <span className="truncate">Note: {video.notes}</span>}
-        </p>
-      </div>
-      <VideoStatusBadge status={video.status} />
-      <OpenLink video={video} />
-      <div className="flex items-center">
-        {!done && video.status === "unwatched" && (
-          <IconButton label={`Start ${video.title}`} onClick={() => action.mutate({ id: video.id, action: "start" })} disabled={busy}>
-            <Play className="h-4 w-4" aria-hidden />
-          </IconButton>
-        )}
-        <IconButton label={`Move ${video.title} up`} onClick={() => move.mutate({ id: video.id, direction: "up" })} disabled={busy || first}>
-          <ChevronUp className="h-4 w-4" aria-hidden />
-        </IconButton>
-        <IconButton label={`Move ${video.title} down`} onClick={() => move.mutate({ id: video.id, direction: "down" })} disabled={busy || last}>
-          <ChevronDown className="h-4 w-4" aria-hidden />
-        </IconButton>
-        <IconButton label={`Edit ${video.title}`} onClick={onEdit}>
-          <Pencil className="h-4 w-4" aria-hidden />
-        </IconButton>
-        <IconButton label={`Delete ${video.title}`} onClick={onDelete} danger>
-          <Trash2 className="h-4 w-4" aria-hidden />
-        </IconButton>
-      </div>
-      {(action.error || move.error) && (
-        <p role="alert" className="basis-full pl-8 text-sm text-red-600 dark:text-red-400">
-          {(action.error ?? move.error)!.message}
-        </p>
-      )}
-    </li>
-  );
-}
-
-function PlaylistView({ playlist, onDeleted }: { playlist: Playlist; onDeleted: () => void }) {
-  const user = useAuthStatus().data?.user;
-  const timeZone = user?.timezone ?? "UTC";
-  const today = todayIn(timeZone);
-  const [view, setView] = useState<VideoView>("open");
-  const [search, setSearch] = useState("");
-  const videos = useVideos(playlist.id, view, search.trim());
-  const [editingPlaylist, setEditingPlaylist] = useState(false);
-  const [videoForm, setVideoForm] = useState<{ video: Video | null } | null>(null);
-  const [pasting, setPasting] = useState(false);
-  const [confirm, setConfirm] = useState<Confirm | null>(null);
-  const delVideo = useDeleteVideo();
-  const delPlaylist = useDeletePlaylist();
-
-  const items = videos.data?.items ?? [];
-  const reorderable = view !== "completed" && !search.trim();
-
-  return (
-    <>
-      <Card aria-label={`${playlist.name} progress`}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+    <Card aria-label={`${playlist.name} overview`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-3">
+          {playlist.thumbnail_url && <img src={playlist.thumbnail_url} alt="" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-full object-cover" />}
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-lg font-semibold text-slate-900 dark:text-white">{playlist.name}</h2>
+              {playlist.kind !== "collection" && <Badge tone="brand">{playlist.kind === "channel" ? "Channel" : "YouTube playlist"}</Badge>}
               {!playlist.active && <Badge>Inactive</Badge>}
             </div>
             {playlist.description && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{playlist.description}</p>}
@@ -237,48 +226,77 @@ function PlaylistView({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
               </a>
             )}
           </div>
-          <div className="flex gap-1">
-            <Button variant="secondary" icon={Pencil} onClick={() => setEditingPlaylist(true)}>
-              Edit
-            </Button>
-            <Button variant="ghost" icon={Trash2} onClick={() => setConfirm({ kind: "playlist" })} aria-label={`Delete playlist ${playlist.name}`}>
-              Delete
-            </Button>
-          </div>
         </div>
-        <div className="mt-4">
-          <ProgressBar percent={playlist.percent} label={`${playlist.name} progress`} />
-          <div className="mt-1.5 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>
-              {playlist.total_videos === 0 ? "No videos added yet" : `${playlist.completed_videos} of ${playlist.total_videos} watched`}
-            </span>
-            <span className="tabular-nums">{playlist.percent}%</span>
-          </div>
+        <div className="flex gap-1">
+          <Button variant="secondary" icon={Pencil} onClick={onEdit}>
+            Edit
+          </Button>
+          <Button variant="ghost" icon={Trash2} onClick={onDelete} aria-label={`Delete playlist ${playlist.name}`}>
+            Delete
+          </Button>
         </div>
-      </Card>
-
-      <div className="mt-4">
-        <TodayCard playlist={playlist} />
       </div>
 
-      <section className="mt-6" aria-label="Videos">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div role="tablist" aria-label="Video views" className="flex gap-1">
-            {VIEWS.map(({ key, label }) => (
-              <button
-                key={key}
-                role="tab"
-                aria-selected={view === key}
-                onClick={() => setView(key)}
-                className={cx(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition",
-                  view === key ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      <div className="mt-4">
+        <ProgressBar percent={playlist.percent} label={`${playlist.name} progress`} />
+        <div className="mt-1.5 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span>{playlist.total_videos === 0 ? "No videos in the library yet" : `${playlist.completed_videos} of ${playlist.total_videos} completed`}</span>
+          <span className="tabular-nums">{playlist.percent}%</span>
+        </div>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {imported && <Stat label="On YouTube" value={countOrUnavailable(playlist.reported_total)} />}
+        {imported && <Stat label="Retrieved" value={playlist.retrieved_count} />}
+        <Stat label="In library" value={playlist.total_videos} />
+        <Stat label="Completed" value={playlist.completed_videos} />
+        <Stat label="In progress" value={playlist.in_progress_videos} />
+        <Stat label="Not started" value={playlist.unwatched_videos} />
+      </dl>
+    </Card>
+  );
+}
+
+/* ---------------------------------- the grid ---------------------------------- */
+
+function Library({ playlist, timeZone, stats }: { playlist: Playlist | undefined; timeZone: string; stats: LibraryStats | undefined }) {
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [status, setStatus] = useState<VideoStatus | "">("");
+  const [sort, setSort] = useState<VideoSort>("recommended");
+  const [search, setSearch] = useState("");
+  const [videoForm, setVideoForm] = useState<{ video: Video | null } | null>(null);
+  const [pasting, setPasting] = useState(false);
+
+  const q = search.trim();
+  const filters: VideoFilters = { view: showRemoved ? "removed" : "all", status, sort, q };
+  const videos = useVideos(playlist?.id, filters);
+  const items = videos.data?.items ?? [];
+  const filtered = Boolean(q || status);
+  const canReorder = playlist?.recommend_order === "manual" && sort === "recommended" && !filtered && !showRemoved;
+
+  return (
+    <section className="mt-6" aria-label="Videos">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div role="tablist" aria-label="Video views" className="flex gap-1">
+          {[
+            { removed: false, label: "Library" },
+            { removed: true, label: `Removed${stats ? ` (${stats.removed})` : ""}` },
+          ].map((t) => (
+            <button
+              key={t.label}
+              role="tab"
+              aria-selected={showRemoved === t.removed}
+              onClick={() => setShowRemoved(t.removed)}
+              className={cx(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition",
+                showRemoved === t.removed ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {playlist && (
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" icon={ClipboardPaste} onClick={() => setPasting(true)}>
               Paste links
@@ -287,95 +305,72 @@ function PlaylistView({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
               Add video
             </Button>
           </div>
-        </div>
-
-        <div className="relative mb-3">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
-          <input
-            type="search"
-            aria-label="Search videos"
-            placeholder="Search videos"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={cx("w-full pl-9", controlClass)}
-          />
-        </div>
-
-        {videos.isPending ? (
-          <Spinner label="Loading videos…" />
-        ) : videos.isError ? (
-          <ErrorNotice error={videos.error} onRetry={() => videos.refetch()} />
-        ) : items.length === 0 ? (
-          <EmptyState
-            icon={CirclePlay}
-            title={search.trim() ? "No videos match your search" : view === "completed" ? "Nothing watched yet" : view === "open" ? (playlist.total_videos > 0 ? "Everything is watched" : "No videos yet") : "No videos yet"}
-          >
-            {search.trim()
-              ? "Try a different word."
-              : view === "completed"
-                ? "Videos you mark as watched will appear here."
-                : playlist.total_videos > 0
-                  ? "Every video in this playlist is marked watched."
-                  : "Paste a list of links, or add videos one at a time."}
-          </EmptyState>
-        ) : (
-          <Card>
-            <ul className="divide-y divide-slate-100 dark:divide-slate-800" aria-label="Video list">
-              {items.map((v, i) => (
-                <VideoRow
-                  key={v.id}
-                  video={v}
-                  first={!reorderable || i === 0}
-                  last={!reorderable || i === items.length - 1}
-                  timeZone={timeZone}
-                  today={today}
-                  onEdit={() => setVideoForm({ video: v })}
-                  onDelete={() => setConfirm({ kind: "video", video: v })}
-                />
-              ))}
-            </ul>
-          </Card>
         )}
-      </section>
+      </div>
 
-      {editingPlaylist && <PlaylistForm playlist={playlist} onClose={() => setEditingPlaylist(false)} />}
-      {videoForm && <VideoForm playlistId={playlist.id} video={videoForm.video} onClose={() => setVideoForm(null)} />}
-      {pasting && <PasteVideosModal playlistId={playlist.id} onClose={() => setPasting(false)} />}
-      {confirm && (
-        <ConfirmDialog
-          title={confirm.kind === "playlist" ? "Delete playlist?" : "Delete video?"}
-          message={
-            confirm.kind === "playlist" ? (
-              <>
-                <strong>{playlist.name}</strong> and its {playlist.total_videos} video{playlist.total_videos === 1 ? "" : "s"} (including your watched
-                history) will be permanently deleted. This can't be undone.
-              </>
-            ) : (
-              <>
-                <strong>{confirm.video.title}</strong> will be permanently deleted.
-              </>
-            )
-          }
-          busy={delVideo.isPending || delPlaylist.isPending}
-          error={(delVideo.error ?? delPlaylist.error)?.message}
-          onCancel={() => {
-            setConfirm(null);
-            delVideo.reset();
-            delPlaylist.reset();
-          }}
-          onConfirm={() => {
-            if (confirm.kind === "video") delVideo.mutate(confirm.video.id, { onSuccess: () => setConfirm(null) });
-            else
-              delPlaylist.mutate(playlist.id, {
-                onSuccess: () => {
-                  setConfirm(null);
-                  onDeleted();
-                },
-              });
-          }}
-        />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <div className="relative min-w-48 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden />
+          <input type="search" aria-label="Search videos" placeholder="Search by title" value={search} onChange={(e) => setSearch(e.target.value)} className={cx("w-full pl-9", controlClass)} />
+        </div>
+        <select aria-label="Filter by status" value={status} onChange={(e) => setStatus(e.target.value as VideoStatus | "")} className={cx("w-40", controlClass)}>
+          <option value="">All statuses</option>
+          {(Object.keys(STATUS_LABEL) as VideoStatus[]).map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Sort videos" value={sort} onChange={(e) => setSort(e.target.value as VideoSort)} className={cx("w-48", controlClass)}>
+          {SORTS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {videos.isPending ? (
+        <Spinner label="Loading videos…" />
+      ) : videos.isError ? (
+        <ErrorNotice error={videos.error} onRetry={() => videos.refetch()} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={CirclePlay}
+          title={filtered ? "No videos match" : showRemoved ? "Nothing removed" : "No videos yet"}
+        >
+          {filtered
+            ? "Try a different search or filter."
+            : showRemoved
+              ? "Videos you remove from the library show up here so you can restore them."
+              : "Import a YouTube channel or playlist, paste links, or add a video by hand."}
+        </EmptyState>
+      ) : (
+        <>
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+            {videos.data!.total} video{videos.data!.total === 1 ? "" : "s"}
+          </p>
+          <ul aria-label="Video library" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {items.map((v, i) => (
+              <VideoCard
+                key={v.id}
+                video={v}
+                timeZone={timeZone}
+                playlistId={playlist?.id}
+                canReorder={canReorder}
+                isFirst={i === 0}
+                isLast={i === items.length - 1}
+                onEdit={(video) => setVideoForm({ video })}
+              />
+            ))}
+          </ul>
+        </>
       )}
-    </>
+
+      {videoForm && playlist && <VideoForm playlistId={playlist.id} video={videoForm.video} onClose={() => setVideoForm(null)} />}
+      {videoForm && !playlist && videoForm.video && <VideoForm playlistId={videoForm.video.playlist_ids[0] ?? 0} video={videoForm.video} onClose={() => setVideoForm(null)} />}
+      {pasting && playlist && <PasteVideosModal playlistId={playlist.id} onClose={() => setPasting(false)} />}
+    </section>
   );
 }
 
@@ -384,22 +379,49 @@ function PlaylistView({ playlist, onDeleted }: { playlist: Playlist; onDeleted: 
 export function VideosPage() {
   const [params, setParams] = useSearchParams();
   const playlists = usePlaylists();
-  const [creating, setCreating] = useState<null | "blank" | "bytebytego">(null);
+  const user = useAuthStatus().data?.user;
+  const timeZone = user?.timezone ?? "UTC";
+  const stats = useLibraryStats("oldest");
+  const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const delPlaylist = useDeletePlaylist();
 
   const list = playlists.data ?? [];
   const wanted = Number(params.get("playlist"));
-  const selected = list.find((p) => p.id === wanted) ?? list[0];
-  const select = (id: number) => setParams({ playlist: String(id) }, { replace: true });
+  const selected = list.find((p) => p.id === wanted); // none selected = the whole library
+  const select = (id: number | null) => setParams(id === null ? {} : { playlist: String(id) }, { replace: true });
+
+  const tab = (label: string, active: boolean, onClick: () => void) => (
+    <button
+      key={label}
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cx(
+        "shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition",
+        active ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+      )}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <>
       <PageHeader
         title="Videos"
-        description="Playlists with a daily watch target. A video only counts as watched when you mark it, and watched videos are never recommended again."
+        description="Your video library. Import a YouTube channel or playlist, pick what you want, and track what you've completed. A video only counts as completed when you mark it."
         actions={
-          <Button icon={Plus} onClick={() => setCreating("blank")}>
-            New playlist
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={Plus} onClick={() => setCreating(true)}>
+              New playlist
+            </Button>
+            <Button icon={Download} onClick={() => setImporting(true)}>
+              Import from YouTube
+            </Button>
+          </div>
         }
       />
 
@@ -407,49 +429,57 @@ export function VideosPage() {
         <Spinner label="Loading playlists…" />
       ) : playlists.isError ? (
         <ErrorNotice error={playlists.error} onRetry={() => playlists.refetch()} />
-      ) : list.length === 0 ? (
-        <EmptyState
-          icon={CirclePlay}
-          title="No playlists yet"
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button onClick={() => setCreating("bytebytego")}>Start a ByteByteGo playlist</Button>
-              <Button variant="secondary" icon={Plus} onClick={() => setCreating("blank")}>
-                New playlist
-              </Button>
-            </div>
-          }
-        >
-          Create a playlist, then paste the links of the videos you want to get through. Nothing is added for you.
-        </EmptyState>
       ) : (
         <>
-          <div role="tablist" aria-label="Playlists" className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1">
-            {list.map((p) => (
-              <button
-                key={p.id}
-                role="tab"
-                aria-selected={selected?.id === p.id}
-                onClick={() => select(p.id)}
-                className={cx(
-                  "shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium transition",
-                  selected?.id === p.id ? "bg-brand-600 text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
-                )}
-              >
-                {p.name}
-              </button>
-            ))}
+          {stats.data && (
+            <div className="mb-4 grid gap-4 lg:grid-cols-2">
+              <Overview stats={stats.data} />
+              <UpNext timeZone={timeZone} />
+            </div>
+          )}
+
+          <div role="tablist" aria-label="Collections" className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1">
+            {tab("All videos", !selected, () => select(null))}
+            {list.map((p) => tab(p.name, selected?.id === p.id, () => select(p.id)))}
           </div>
-          {selected && <PlaylistView key={selected.id} playlist={selected} onDeleted={() => setParams({}, { replace: true })} />}
+
+          {selected && (
+            <div className="space-y-4">
+              <CollectionOverview playlist={selected} onEdit={() => setEditing(true)} onDelete={() => setConfirmDelete(true)} />
+              <TodayCard playlist={selected} />
+            </div>
+          )}
+
+          <Library key={selected?.id ?? "all"} playlist={selected} timeZone={timeZone} stats={stats.data} />
         </>
       )}
 
-      {creating && (
-        <PlaylistForm
-          playlist={null}
-          preset={creating === "bytebytego" ? BYTEBYTEGO_PRESET : undefined}
-          onClose={() => setCreating(null)}
-          onSaved={(p) => select(p.id)}
+      {creating && <PlaylistForm playlist={null} onClose={() => setCreating(false)} onSaved={(p) => select(p.id)} />}
+      {editing && selected && <PlaylistForm playlist={selected} onClose={() => setEditing(false)} />}
+      {importing && <ImportModal onClose={() => setImporting(false)} onImported={(r) => select(r.collection.id)} />}
+      {confirmDelete && selected && (
+        <ConfirmDialog
+          title="Delete playlist?"
+          message={
+            <>
+              <strong>{selected.name}</strong> will be deleted. Its {selected.total_videos} video{selected.total_videos === 1 ? "" : "s"} stay in your library
+              (with their progress), and nothing happens on YouTube.
+            </>
+          }
+          busy={delPlaylist.isPending}
+          error={delPlaylist.error?.message}
+          onCancel={() => {
+            setConfirmDelete(false);
+            delPlaylist.reset();
+          }}
+          onConfirm={() =>
+            delPlaylist.mutate(selected.id, {
+              onSuccess: () => {
+                setConfirmDelete(false);
+                select(null);
+              },
+            })
+          }
         />
       )}
     </>

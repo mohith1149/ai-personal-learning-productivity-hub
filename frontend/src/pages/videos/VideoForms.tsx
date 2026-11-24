@@ -7,33 +7,31 @@ import {
   useUpdateVideo,
   type BulkResult,
   type Playlist,
+  type RecommendOrder,
   type Video,
 } from "../../api/videos";
-import { FormError, TextArea, TextInput } from "../../components/forms";
+import { FormError, SelectInput, TextArea, TextInput } from "../../components/forms";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
 
-export const BYTEBYTEGO_PRESET = { name: "ByteByteGo", source_url: "https://www.youtube.com/@ByteByteGo", daily_target: 1 };
-
-/** Create or edit a playlist. `preset` pre-fills a new one (used by the ByteByteGo quick start). */
+/** Create or edit a collection (hand-made, or the settings of an imported channel/playlist). */
 export function PlaylistForm({
   playlist,
-  preset,
   onClose,
   onSaved,
 }: {
   playlist: Playlist | null;
-  preset?: { name: string; source_url: string; daily_target: number };
   onClose: () => void;
   onSaved?: (p: Playlist) => void;
 }) {
   const create = useCreatePlaylist();
   const update = useUpdatePlaylist();
   const [f, setF] = useState({
-    name: playlist?.name ?? preset?.name ?? "",
-    source_url: playlist?.source_url ?? preset?.source_url ?? "",
+    name: playlist?.name ?? "",
+    source_url: playlist?.source_url ?? "",
     description: playlist?.description ?? "",
-    daily_target: String(playlist?.daily_target ?? preset?.daily_target ?? 1),
+    daily_target: String(playlist?.daily_target ?? 1),
+    recommend_order: playlist?.recommend_order ?? ("oldest" as RecommendOrder),
     active: playlist?.active ?? true,
   });
   const [localError, setLocalError] = useState<string | null>(null);
@@ -52,6 +50,7 @@ export function PlaylistForm({
       description: f.description.trim() || null,
       daily_target: target,
       active: f.active,
+      recommend_order: f.recommend_order,
     };
     const done = (p: Playlist) => {
       onSaved?.(p);
@@ -81,6 +80,16 @@ export function PlaylistForm({
           value={f.daily_target}
           onChange={(e) => setF({ ...f, daily_target: e.target.value })}
         />
+        <SelectInput
+          label="Recommend videos"
+          value={f.recommend_order}
+          onChange={(e) => setF({ ...f, recommend_order: e.target.value as RecommendOrder })}
+          hint="Which unwatched video comes next. Completed videos are never recommended."
+        >
+          <option value="oldest">Oldest published first</option>
+          <option value="newest">Newest published first</option>
+          <option value="manual">My own order</option>
+        </SelectInput>
         <TextArea label="Description" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} />
@@ -179,6 +188,7 @@ export function PasteVideosModal({ playlistId, onClose }: { playlistId: number; 
         <div className="space-y-3" role="status">
           <p className="text-sm text-slate-700 dark:text-slate-300">
             Added <strong>{result.added}</strong> video{result.added === 1 ? "" : "s"}
+            {result.linked > 0 && <>, linked {result.linked} already in your library</>}
             {result.duplicates > 0 && <>, skipped {result.duplicates} already in the playlist</>}
             {result.invalid.length > 0 && <>, couldn't read {result.invalid.length} line{result.invalid.length === 1 ? "" : "s"}</>}.
           </p>

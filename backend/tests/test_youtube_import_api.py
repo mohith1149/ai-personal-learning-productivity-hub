@@ -227,10 +227,22 @@ def test_playlist_import_stores_the_playlist_association(c):
         "playlist", PL, "Fake playlist", 4, 4)
 
 
-def test_collection_name_clash_with_a_hand_made_playlist_is_handled(c):
-    assert c.post("/api/video-playlists", json={"name": "Fake Channel"}).status_code == 201
-    out = do_import(c, [vid(1)])
-    assert out["collection"]["name"] == "Fake Channel (YouTube)"
+def test_a_hand_made_playlist_with_the_same_name_is_adopted_not_duplicated(c):
+    mine = c.post("/api/video-playlists", json={"name": "fake channel", "daily_target": 3, "recommend_order": "manual"}).json()
+    c.post(f"/api/video-playlists/{mine['id']}/videos", json={"title": "My own video"})
+    col = do_import(c, [vid(1), vid(2)])["collection"]
+    assert col["id"] == mine["id"] and (col["kind"], col["recommend_order"], col["daily_target"]) == ("channel", "oldest", 3)
+    assert col["total_videos"] == 3 and col["youtube_channel_id"] == CHANNEL_ID   # its own video is kept
+    assert len(c.get("/api/video-playlists").json()) == 1
+
+
+def test_a_playlist_with_a_clashing_name_but_another_kind_gets_a_suffix(c):
+    do_import(c, [vid(1)])                                          # the channel collection "Fake Channel"
+    fake_pl = FakeYouTube()
+    fake_pl.playlists[PL]["title"] = "Fake Channel"                 # a YouTube playlist that happens to share the name
+    app.dependency_overrides[get_client] = lambda: fake_pl.client()
+    out = do_import(c, [vid(5)], url=PLAYLIST)
+    assert out["collection"]["name"] == "Fake Channel (YouTube)" and out["collection"]["kind"] == "playlist"
 
 
 def test_removed_video_is_restored_when_imported_again(c):
