@@ -57,6 +57,19 @@ describe("overview and recommendation", () => {
     expect(within(overall).getByText("Completed").nextSibling).toHaveTextContent("1");
   });
 
+  it("inside a collection, 'Watch next' follows that collection's own order (e.g. a study plan), not publish dates", async () => {
+    const seed = bbg();
+    seed.playlists![0].recommend_order = "manual";
+    seed.videos = [seed.videos![2], seed.videos![0], seed.videos![1]]; // plan order: Rate limiting first, though it is the newest
+    await open("/videos?playlist=1", seed);
+    const next = await screen.findByRole("region", { name: "Recommended next video" });
+    expect(await within(next).findByText("Watch next in ByteByteGo")).toBeInTheDocument();
+    expect(within(next).getByText("Rate limiting")).toBeInTheDocument();
+    expect(within(next).queryByRole("combobox", { name: "Recommendation order" })).not.toBeInTheDocument();
+    const today = await screen.findByRole("list", { name: "Up next today" });
+    expect(within(today).getAllByRole("listitem").map((li) => li.querySelector("p")?.textContent)).toEqual(["Rate limiting", "How DNS works"]);
+  });
+
   it("can switch the recommendation to newest first", async () => {
     const { fake } = await open("/videos");
     const next = await screen.findByRole("region", { name: "Recommended next video" });

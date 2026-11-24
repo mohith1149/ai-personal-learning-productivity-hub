@@ -445,6 +445,10 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Verified LIVE with the owner's key: ByteByteGo = 172 videos on YouTube, 25 retrieved over page tokens, thumbnails/durations present, playlist "System Design Fundamentals" 104 videos, bad links give clear errors. No watch history is read (the API has none).
 - Alembic env now sets `PRAGMA foreign_keys=OFF` during migrations: SQLite batch rebuilds were cascade-deleting child rows (found when testing this migration).
 - Frontend: `pages/videos/` (`VideosPage` overview + "Watch next" card + collection tabs + filters/sort + card grid, `VideoCard`, `ImportModal` 3-step, `VideoForms`), `api/youtube.ts`, `lib/format.ts`. Tests: backend 500+ (library, client, import API), frontend 145.
+- **Study plan applied (2026-11-24):** the owner's 21-day ByteByteGo plan (`backend/plans/bytebytego_21_day.txt`, 5 videos/day, day 21 has 4) is applied to the
+  imported collection "BYTEBYTEGO" via `python backend/scripts/apply_plan.py <plan> "<collection>" [--apply]` (dry run by default; matches titles to videos already
+  in the collection, never creates any). Result: `recommend_order='manual'`, `daily_target=5`, all 104 matched; the "revisit" line is a note, not a video. Inside a
+  collection the "Watch next" card follows that collection's order. Backup before: `backend/data/backups/hub-before-plan-*.db`.
 - Not built: Google Takeout watch-history import; thumbnails are hot-linked from YouTube.
 
 ## 10a. Session handoff (read this first in a new session)
