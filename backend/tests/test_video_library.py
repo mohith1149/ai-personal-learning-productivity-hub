@@ -314,3 +314,25 @@ def test_manual_order_follows_move_and_ignores_dates(db, user):
     assert [v.id for v in svc.next_videos(db, p, 5)] == [a.id, b.id]
     svc.move_video(db, user, b.id, "up", p.id)
     assert [v.id for v in svc.next_videos(db, p, 5)] == [b.id, a.id]
+
+
+# ---------------- playlist/channel links belong in Import, not in the paste/add forms ----------------
+
+COLLECTION_LINKS = ["https://www.youtube.com/playlist?list=PLCRMIe5FDPsd0gVs500xeOewfySTsmEjf",
+                    "https://www.youtube.com/@ByteByteGo", "https://www.youtube.com/channel/UCZgt6AzoyjslHTC9dz0UoTw"]
+
+
+@pytest.mark.parametrize("url", COLLECTION_LINKS)
+def test_add_video_rejects_channel_and_playlist_links(db, user, url):
+    p = mk_playlist(db, user)
+    with pytest.raises(svc.RuleError, match="Import from YouTube"):
+        svc.add_video(db, user, p.id, s.VideoCreate(title="x", url=url))
+    assert db.query(Video).count() == 0
+
+
+def test_paste_rejects_collection_links_but_keeps_real_videos(db, user):
+    p = mk_playlist(db, user)
+    lines = [*COLLECTION_LINKS, "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLCRMIe5FDPsd0gVs500xeOewfySTsmEjf",
+             "https://example.com/some-page"]
+    r = svc.bulk_add_videos(db, user, p.id, s.BulkVideos(lines=lines))
+    assert r["added"] == 2 and len(r["invalid"]) == 3 and all("Import from YouTube" in i for i in r["invalid"])

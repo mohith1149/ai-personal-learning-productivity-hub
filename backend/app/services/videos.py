@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.timeutil import local_day_bounds_utc, user_today
 from app.models import User, Video, VideoMembership, VideoPlaylist
 from app.schemas import videos as s
+from app.services.youtube import YouTubeError, parse_source
 
 
 class NotFound(Exception):
@@ -76,6 +77,20 @@ def parse_line(line: str) -> tuple[str, str] | None:
         vid = youtube_video_id(url)
         title = f"YouTube video {vid}" if vid else url[:200]
     return title[:300], url
+
+
+def is_collection_link(url: str | None) -> bool:
+    """True for a YouTube channel/playlist link (not a single video). Those must go through Import from YouTube."""
+    if not url or youtube_video_id(url):
+        return False
+    try:
+        parse_source(url)
+        return True
+    except YouTubeError:
+        return False
+
+
+IMPORT_HINT = "That is a channel or playlist link. Use 'Import from YouTube' to fetch its videos."
 
 
 # ============================== lookups ==============================
@@ -287,6 +302,8 @@ def upsert_video(db: Session, user: User, playlist: VideoPlaylist, fields: dict)
 
 def add_video(db: Session, user: User, playlist_id: int, data: s.VideoCreate) -> Video:
     p = _get_playlist(db, user, playlist_id)
+    if is_collection_link(data.url):
+        raise RuleError(IMPORT_HINT)
     outcome, v = upsert_video(db, user, p, {**data.model_dump(), "youtube_video_id": youtube_video_id(data.url)})
     if outcome == "duplicate":
         db.rollback()
@@ -305,6 +322,9 @@ def bulk_add_videos(db: Session, user: User, playlist_id: int, data: s.BulkVideo
             result["invalid"].append(raw[:120])
             continue
         title, url = parsed
+        if is_collection_link(url):
+            result["invalid"].append(f"{raw[:100]} ({IMPORT_HINT})")
+            continue
         yt = youtube_video_id(url)
         if (yt or url) in seen:
             result["duplicates"] += 1
