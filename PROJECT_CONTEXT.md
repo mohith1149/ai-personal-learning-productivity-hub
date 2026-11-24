@@ -267,7 +267,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 |---|---|---|
 | 1 | Architecture, schema, API design, this document | ✅ done |
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
-| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: daily planner (milestone 10), then daily challenge (milestone 9) |
+| 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: daily challenge (milestone 9) |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification, calendar | ⏳ |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning | ⏳ |
@@ -491,18 +491,35 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Tests: backend `test_projects.py`, `test_projects_api.py` (83), frontend `projects.test.tsx` (24) with `fakeProjects.ts`.
 - Not built: GitHub verification of repos/commits (Phase 4), milestone reordering, linking ideas (`project_ideas` table exists, used by Milestone 9).
 
+**Milestone 10: Daily planner (done, branch `feat/planner`)**
+- Route `/planner`. Migration `b8d2f5a1c6e3`: table `planner_excusals` (user, kind, ref_id, date, reason; unique per item per day). It is the ONLY stored planner data:
+  the plan itself is assembled from the other features on every request (`services/planner.build_day`).
+- Endpoints: `GET /planner?day=`, `POST /planner/complete|reopen|excuse|unexcuse` (body `{kind, ref_id, date[, reason]}`), `POST /planner/tasks/{id}/reschedule`
+  (`{date, from_date, move_due_date}`). Every action returns the refreshed day plan.
+- What shows on a day: TASKS (scheduled/due that day; on today also every open overdue task and anything scheduled earlier = "overdue"); LESSONS (today: next lesson of each active
+  course, one per course per day); VIDEOS (today: each active playlist's daily-target videos in that playlist's own order); ROADMAP TOPICS (today: in progress + next); HABITS (daily
+  due every day from start date, missed past days = overdue and can still be recorded; weekly due until the week's target is met); PROJECTS (today: "work on X" until a session is logged;
+  can't be completed here, link to log a session). Past/other days show what was completed on them (+ open tasks that were planned for that day, as overdue). Future days: tasks only.
+- Completing/reopening delegates to the owning service (tasks/courses/videos/roadmap/habits): single source of truth. Only habits can be changed for a past day; everything else only
+  on today's plan. Reschedule only moves `scheduled_date` (optionally `due_date`), sets `carried_from_date`/`carry_count`, never changes status: **a rescheduled task is not completed**.
+- Excused = skipped for that day with a reason (>=3 chars); not counted as overdue/missed and left out of the day's percentage; completed items and future days can't be excused;
+  excuse covers one day only. Summary: total/completed/pending/overdue/excused, floor percent, study minutes (learning_sessions) and project minutes, per-type counts.
+- Found by a live check on the real data: items were sorted alphabetically, hiding the 21-day plan order; fixed (stable sort keeps each feature's own order).
+- Tests: backend `test_planner.py` (47), `test_planner_api.py` (18); frontend `planner.test.tsx` (16) + `fakePlanner.ts`.
+- Not built: weekly view, drag-to-reorder, planner reminders (Phase 5), the dashboard "today" widget (Milestone 11).
+
 ## 10a. Session handoff (read this first in a new session)
 
 Updated 2026-11-24. **Rule from the owner: always save progress in this file (not README) at the end of every step.**
 
-- State: Milestones 1-8 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, **projects**). Real `hub.db` at migration `a7c1e4f8b3d9`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
+- State: Milestones 1-8 + 10 done (auth, shell, tasks, courses, videos+YouTube, AI roadmap, habits, projects, **daily planner**). Real `hub.db` at migration `b8d2f5a1c6e3`. Earlier: Milestone 5 (video playlists) merged to `main`. **Then the owner's spec #7 (YouTube channel & playlist tracker) was built on `feat/youtube-tracker`** (see "Milestone 5b" in §10). Real `hub.db` is migrated to `d4f7b1c9e3a5` (backup `backend/data/backups/hub-before-library-*.db`, git-ignored).
   Done: auth, app shell, tasks, courses, video library + YouTube import.
 - Owner's Phase 3 roadmap (pasted 2026-11-24) order: 1 auth ✅, 2 layout ✅, 3 dashboard (shell only; real metrics deferred to
   Milestone 11), 4 tasks ✅, 5 courses ✅, 6 ByteByteGo videos ✅ (= our Milestone 5), 7 AI roadmap ✅ (= our Milestone 6),
-  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), **10 planner ← NEXT** (owner asked for projects first; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; then Milestone 9 daily challenge), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
-- Next action: branch `feat/planner`; daily planner (owner spec section 11): one day view combining tasks, deadlines, course lessons, ByteByteGo videos,
-  roadmap topics, habits, project work; complete from the planner (delegating to each feature's own service), reschedule tasks (rescheduled != completed), overdue, completed,
-  excused (needs a reason; excuse table design pending), daily study time and productivity summary. Then Milestone 9 (daily challenge with evidence).
+  8 habits ✅ (= our Milestone 7), 9 projects ✅ (= our Milestone 8), 10 planner ✅ (built after projects; the planner is what connects tasks, lessons, videos, roadmap, habits and projects into one day view; **Milestone 9 daily challenge ← NEXT**), 10 planner + daily accountability, 11 seed data, 12 integration tests, 13 docs, 14 final verification.
+- Next action: branch `feat/challenge`; daily AI project challenge (owner spec section 12): one primary project challenge per calendar day (new or existing project), daily
+  task suggestions from roadmap/courses/projects, evidence (summary, commit hash + message, repo URL, time), accountability status; a day can't be completed without evidence; empty/meaningless
+  commits don't count; excused days need a reason; evidence stays 'unverified' until GitHub verification (Phase 4). `daily_challenges` table already exists. Then dashboard (Milestone 11).
 - Reminders: pre-commit checks (backend pytest, frontend typecheck, production build, git status, no secrets/.env/db files); explain
   each component to the owner (what, why, endpoints, DB, logic, how to test, concepts); AI provider abstraction + tool-calling docs
   come in Milestone 12 / Phase 6; never mark unfinished work as done.

@@ -39,9 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/planner",
         label: "Daily planner",
         icon: CalendarCheck,
-        status: "soon",
-        milestone: "Milestone 10",
-        blurb: "Today's tasks, habits, study goal and project work in one plan.",
+        status: "ready",
       },
       {
         to: "/challenge",
