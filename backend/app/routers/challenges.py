@@ -1,13 +1,16 @@
 """HTTP endpoints for the daily AI project challenge. Login required."""
 from datetime import date, timedelta
+from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
+from app.config import get_settings
 from app.core.deps import CurrentUser, DbSession
 from app.core.timeutil import user_today
 from app.schemas import challenges as s
 from app.services import challenges as svc
+from app.services import github as gh
 
 router = APIRouter(prefix="/challenges", tags=["challenges"])
 
@@ -20,6 +23,18 @@ def _http(exc: Exception) -> HTTPException:
     if isinstance(exc, svc.Conflict):
         return HTTPException(status.HTTP_409_CONFLICT, str(exc))
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
+
+
+_GH_STATUS = {"bad_repo": 422, "bad_sha": 422, "not_found": 404, "rate_limited": 429, "bad_token": 503, "network": 502, "api_error": 502}
+
+
+def get_github(user: CurrentUser) -> Iterator[gh.GitHubClient]:
+    """One client per request (tests replace this dependency with a fake-transport client)."""
+    client = gh.GitHubClient(get_settings().github_token)
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 def _run(fn, *args):
@@ -76,6 +91,15 @@ def start(challenge_id: int, user: CurrentUser, db: DbSession):
 @router.post("/{challenge_id}/complete", response_model=s.ChallengeOut)
 def complete(challenge_id: int, body: s.CompleteIn, user: CurrentUser, db: DbSession):
     return _run(svc.complete_challenge, db, user, challenge_id, body)
+
+
+@router.post("/{challenge_id}/verify", response_model=s.VerifyOut)
+def verify(challenge_id: int, user: CurrentUser, db: DbSession, client: Annotated[gh.GitHubClient, Depends(get_github)]):
+    """Check the completed day's commit against GitHub. Only a pass marks it verified."""
+    try:
+        return _run(svc.verify_challenge, db, user, challenge_id, client)
+    except gh.GitHubError as e:
+        raise HTTPException(_GH_STATUS.get(e.code, 502), e.message) from None
 
 
 @router.delete("/{challenge_id}", status_code=status.HTTP_204_NO_CONTENT)

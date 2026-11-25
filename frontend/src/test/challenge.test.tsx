@@ -233,6 +233,28 @@ describe("daily challenge", () => {
     expect(await within(cal).findByLabelText(`${addDays(TODAY(), -1)}: Excused (RAG chatbot)`)).toBeInTheDocument();
   });
 
+  const doneToday = () => mkChallenge({ id: 7, status: "completed", can_complete: false, implemented_summary: "Wrote the loader and tested it.", repo_url: "https://github.com/me/rag", commit_sha: "abcdef12345", commit_message: "Add loader", actual_minutes: 60 });
+
+  it("verifies a completed day on GitHub and then shows it as verified", async () => {
+    const user = userEvent.setup();
+    const { fake } = await open({ challenges: [doneToday()] });
+    const card = await today();
+    await user.click(await within(card).findByRole("button", { name: "Verify on GitHub" }));
+    await waitFor(() => expect(fake.callsTo("POST", /challenges\/7\/verify$/)).toHaveLength(1));
+    expect(await within(card).findByText(/Verified on GitHub/)).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Verify on GitHub" })).not.toBeInTheDocument();
+  });
+
+  it("when verification fails it lists which check failed and stays unverified", async () => {
+    const user = userEvent.setup();
+    await open({ challenges: [doneToday()], verifyOk: false });
+    const card = await today();
+    await user.click(await within(card).findByRole("button", { name: "Verify on GitHub" }));
+    const list = await within(card).findByRole("list", { name: "Verification checks" });
+    expect(list).toHaveTextContent("Failed: Message matches");
+    expect(within(card).getByRole("button", { name: "Verify on GitHub" })).toBeInTheDocument();
+  });
+
   it("lists completed days with their evidence in the history", async () => {
     await open({ challenges: [mkChallenge({ id: 1, date: addDays(TODAY(), -2), status: "completed", can_complete: false, implemented_summary: "Wrote the loader and tested it.", commit_sha: "abcdef12345", commit_message: "Add loader", actual_minutes: 75 })] });
     const history = await screen.findByRole("region", { name: "Evidence history" });

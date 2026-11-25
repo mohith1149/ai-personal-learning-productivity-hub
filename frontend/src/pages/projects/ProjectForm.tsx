@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { PRIORITY_LABEL, PROJECT_STATUS_LABEL, useCreateProject, useUpdateProject, type Origin, type ProjectDetail, type ProjectStatus, type ProjectSummary } from "../../api/projects";
+import { PRIORITY_LABEL, PROJECT_STATUS_LABEL, useCreateProject, useRepoPreview, useUpdateProject, type Origin, type ProjectDetail, type ProjectStatus, type ProjectSummary } from "../../api/projects";
 import { FormError, SelectInput, TextArea, TextInput } from "../../components/forms";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
@@ -10,6 +10,8 @@ const REPO = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?(\.git)?\
 export function ProjectForm({ project, onClose, onSaved }: { project: ProjectSummary | null; onClose: () => void; onSaved?: (p: ProjectDetail) => void }) {
   const create = useCreateProject();
   const update = useUpdateProject();
+  const preview = useRepoPreview();
+  const [filled, setFilled] = useState<string | null>(null);
   const [f, setF] = useState({
     title: project?.title ?? "",
     origin: (project?.origin ?? "new") as Origin,
@@ -24,6 +26,26 @@ export function ProjectForm({ project, onClose, onSaved }: { project: ProjectSum
   });
   const [localError, setLocalError] = useState<string | null>(null);
   const pending = create.isPending || update.isPending;
+
+  /** Fill only EMPTY fields so anything already typed is never overwritten. */
+  const fillFromGitHub = () => {
+    setLocalError(null);
+    setFilled(null);
+    if (!REPO.test(f.repo_url.trim())) return setLocalError("Enter a GitHub link like https://github.com/owner/repository first.");
+    preview.mutate(f.repo_url.trim(), {
+      onSuccess: (r) => {
+        setF((cur) => ({
+          ...cur,
+          title: cur.title.trim() ? cur.title : r.title,
+          description: cur.description.trim() ? cur.description : (r.description ?? ""),
+          stack: cur.stack.trim() ? cur.stack : r.tech_stack.join(", "),
+          repo_url: r.repo_url,
+          start_date: cur.start_date || (cur.origin === "existing" ? (r.start_date ?? "") : ""),
+        }));
+        setFilled("Filled the empty fields from GitHub. Check them, add the objective, and edit anything.");
+      },
+    });
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -79,11 +101,19 @@ export function ProjectForm({ project, onClose, onSaved }: { project: ProjectSum
         <TextArea label="Objective" rows={2} value={f.objective} onChange={(e) => setF({ ...f, objective: e.target.value })} hint="What do you want to achieve or learn?" />
         <TextInput label="Technology stack" value={f.stack} onChange={(e) => setF({ ...f, stack: e.target.value })} placeholder="Python, FastAPI, ChromaDB" hint="Separate with commas." />
         <TextInput label="GitHub repository" value={f.repo_url} onChange={(e) => setF({ ...f, repo_url: e.target.value })} placeholder="https://github.com/owner/repository" />
+        {!project && (
+          <div>
+            <Button type="button" variant="secondary" loading={preview.isPending} onClick={fillFromGitHub}>
+              Fill from GitHub
+            </Button>
+            {filled && <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{filled}</p>}
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <TextInput label="Start date" type="date" value={f.start_date} onChange={(e) => setF({ ...f, start_date: e.target.value })} hint={f.origin === "new" ? "Leave empty to start today." : "Optional."} />
           <TextInput label="Target completion date" type="date" value={f.target_date} onChange={(e) => setF({ ...f, target_date: e.target.value })} />
         </div>
-        <FormError message={localError ?? (create.error ?? update.error)?.message} />
+        <FormError message={localError ?? (create.error ?? update.error ?? preview.error)?.message} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel

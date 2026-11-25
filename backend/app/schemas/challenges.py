@@ -151,3 +151,15 @@ class Calendar(BaseModel):
     end: DateT
     days: list[CalendarDay]
     stats: Stats
+
+
+class VerifyCheck(BaseModel):
+    name: str
+    ok: bool
+    detail: str
+
+
+class VerifyOut(BaseModel):
+    verified: bool
+    checks: list[VerifyCheck]
+    challenge: ChallengeOut
