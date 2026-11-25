@@ -47,7 +47,7 @@ def test_status_with_a_provider_still_says_it_is_not_live_verified(c, monkeypatc
 def test_the_tools_endpoint_lists_what_the_assistant_may_do(c):
     tools = {t["name"]: t for t in c.get("/api/ai/tools").json()}
     assert tools["get_today_tasks"]["kind"] == "read" and tools["create_task"]["kind"] == "write"
-    assert tools["create_task"]["input_schema"]["properties"]["title"] and len(tools) == 15
+    assert tools["create_task"]["input_schema"]["properties"]["title"] and len(tools) == 16
     assert "api_key" not in str(tools).lower()
 
 

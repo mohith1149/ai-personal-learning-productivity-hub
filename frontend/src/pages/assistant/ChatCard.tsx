@@ -1,6 +1,6 @@
 import { Bot, Plus, SendHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { useChat, useConversation } from "../../api/assistant";
+import { useChat, useConversation, type ChatMessage } from "../../api/assistant";
 import { controlClass } from "../../components/forms";
 import { Markdown } from "../../components/Markdown";
 import { Button, Card, cx, Spinner } from "../../components/ui";
@@ -10,6 +10,28 @@ const SUGGESTIONS = ["What is on my plan today?", "What is overdue?", "How is my
 
 /** "get_today_tasks" -> "today tasks" */
 const friendly = (tool: string) => tool.replace(/^get_/, "").replace(/_/g, " ");
+
+const CHECKS = [
+  { label: "Morning check-in", message: "Morning check-in: help me plan today." },
+  { label: "Evening check-out", message: "Evening check-out: review my day." },
+];
+
+type Turn = { id: number; role: "user"; text: string } | { id: number; role: "assistant"; text: string; tools: string[] };
+
+/** One question is one answer: the assistant's messages between two of yours (it writes one around each tool call) become a single bubble. */
+export function groupTurns(messages: ChatMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const m of messages) {
+    const last = turns[turns.length - 1];
+    const tools = m.tool_calls.map((t) => friendly(t.name));
+    if (m.role === "user") turns.push({ id: m.id, role: "user", text: m.text });
+    else if (last?.role === "assistant") {
+      last.text = [last.text, m.text].filter(Boolean).join("\n\n");
+      last.tools = [...new Set([...last.tools, ...tools])];
+    } else turns.push({ id: m.id, role: "assistant", text: m.text, tools: [...new Set(tools)] });
+  }
+  return turns;
+}
 
 function Avatar() {
   return (
@@ -43,6 +65,7 @@ export function ChatCard() {
   const chat = useChat();
   const end = useRef<HTMLDivElement>(null);
   const messages = convo.data?.messages ?? [];
+  const turns = groupTurns(messages);
 
   useEffect(() => {
     end.current?.scrollIntoView?.({ block: "end", behavior: "smooth" });
@@ -127,22 +150,22 @@ export function ChatCard() {
             </div>
           </div>
         )}
-        {messages.map((m) =>
+        {turns.map((m) =>
           m.role === "user" ? (
             <div key={m.id} className="flex justify-end">
               <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-brand-600 px-4 py-2.5 text-sm text-white">{m.text}</p>
             </div>
           ) : (
-            m.text || m.tool_calls.length > 0 ? (
+            m.text || m.tools.length > 0 ? (
               <div key={m.id} className="flex items-start gap-2.5">
                 <Avatar />
                 <div className="min-w-0 max-w-[88%]">
-                  {m.tool_calls.length > 0 && (
+                  {m.tools.length > 0 && (
                     <p className="mb-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <span>Looked up:</span>
-                      {m.tool_calls.map((t, i) => (
-                        <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">
-                          {friendly(t.name)}
+                      {m.tools.map((t) => (
+                        <span key={t} className="rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">
+                          {t}
                         </span>
                       ))}
                     </p>
@@ -177,8 +200,21 @@ export function ChatCard() {
         </p>
       )}
 
+      <div className="flex flex-wrap gap-2 border-t border-slate-200 px-3 pt-3 dark:border-slate-800">
+        {CHECKS.map((c) => (
+          <button
+            key={c.label}
+            type="button"
+            disabled={chat.isPending}
+            onClick={() => send(c.message)}
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 transition hover:border-brand-500 hover:bg-brand-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
       <form
-        className="flex items-end gap-2 border-t border-slate-200 p-3 dark:border-slate-800"
+        className="flex items-end gap-2 px-3 pb-1"
         onSubmit={(e) => {
           e.preventDefault();
           send();

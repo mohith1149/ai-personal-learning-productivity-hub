@@ -20,7 +20,7 @@ function StatusCard() {
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <Badge tone={status.data.connected ? "brand" : "neutral"}>{status.data.connected ? "Provider configured" : "Not connected"}</Badge>
             {status.data.model && <span>Model: {choice?.model ?? status.data.model}</span>}
-            {!status.data.live_verified && <Badge>Not tested live</Badge>}
+            {status.data.live_verified ? <Badge tone="brand">Tested live</Badge> : <Badge>Not tested live</Badge>}
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{status.data.message}</p>
           {status.data.connected && (

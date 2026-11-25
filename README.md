@@ -15,11 +15,10 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 
 | Not built | Planned |
 |---|---|
-| Live use of the AI assistant. The chat window and the project autofill are built and tested against a scripted stand-in, but never against the real Anthropic API until you add a key (see below). Daily check-in/check-out planning is not built. | needs your API key |
 | GitHub account sign-in (OAuth) and repo sync. Not needed: verification and project import work on public repos with no account link, and `GITHUB_TOKEN` covers private ones. | not scheduled |
 | Gmail API (OAuth) sending. SMTP with an App Password is built and was tested with a real Gmail account and n8n. | not scheduled |
 | Weekly/monthly analytics | Phase 7 |
-| OpenAI and Gemini adapters | not scheduled |
+| OpenAI adapter. Groq, Gemini and Anthropic are built (Anthropic only against a fake server; Groq and Gemini were run live). | not scheduled |
 
 ## What each part does
 
@@ -35,7 +34,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 | Projects | Projects, milestones, development sessions. **Suggest with AI** (when a key is set) fills the empty fields and proposes milestones from a repo link and/or your description; you edit before creating. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
 | Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Settings | Your account (read-only), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
-| AI assistant | Chat window (shown once a key is set) with a **model menu**, 15 tools (10 read, 5 propose-only), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
+| AI assistant | Chat window (shown once a key is set) with a **model menu**, 16 tools (11 read, 5 propose-only), **Morning check-in / Evening check-out** buttons, a GitHub repo lookup (paste a repo link in the chat), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
 
 ## Run it (Windows, development)
 

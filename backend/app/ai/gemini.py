@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 import httpx
 
+from app.ai import net
 from app.ai.types import LLMResponse, ProviderError, ToolCall
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
@@ -95,10 +96,7 @@ class GeminiProvider:
         }
         if tools:
             body["tools"] = [{"functionDeclarations": _declarations(tools)}]
-        try:
-            r = self._http.post(f"{API_BASE}/models/{quote(self.model, safe='')}:generateContent", json=body, headers={"x-goog-api-key": self._key})
-        except httpx.HTTPError:
-            raise ProviderError("Couldn't reach the Gemini API. Check your connection") from None
+        r = net.post(self._http, f"{API_BASE}/models/{quote(self.model, safe='')}:generateContent", "Gemini", json=body, headers={"x-goog-api-key": self._key})
         if r.status_code != 200:
             raise ProviderError(self._explain(r.status_code))
         try:

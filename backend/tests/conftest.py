@@ -24,6 +24,14 @@ from app.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def _forget_live_checks():
+    from app.routers import assistant
+
+    assistant._verified.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _reset_db():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

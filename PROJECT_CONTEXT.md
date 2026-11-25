@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-24 — YouTube tracker (spec #7) built on feat/youtube-tracker. Phases 1–2 complete. Phase 3 in progress: milestones 1 (auth), 2 (app shell), 3 (tasks), 4 (courses) and 5 (video playlists) done.
+Last updated: 2026-11-25 — Phases 4, 5 and 6 complete (Phase 6 run live on Groq and Gemini). Phase 7 (analytics, full test pass) and Phase 8 (docs) remain.
 
 ---
 
@@ -270,7 +270,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 | 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: integration tests, docs, final verification |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification (✅ verify button), calendar, repo sync; **plus** "import project from a GitHub repo" (no LLM: read repo name, description, languages, README and prefill the project form) | ✅ done (verify + import via public API / optional `GITHUB_TOKEN`). OAuth, repo sync and a separate commit calendar deliberately skipped: the challenge calendar already shows verified days |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ✅ built and tested with a fake mail server; real SMTP send needs the owner's App Password. Gmail API not built |
-| 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning; **plus** "AI project autofill": give a repo URL or a description, the model reads it through a read-only tool and proposes title, description, objective, tech stack and milestones into the project form. The user reviews and edits before saving; nothing is saved automatically | 🚧 chat UI, connection test and AI project autofill built and tested against a scripted provider; NOT yet run against the real API (needs the owner's key). Check-in/check-out planning not built |
+| 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning; **plus** "AI project autofill": give a repo URL or a description, the model reads it through a read-only tool and proposes title, description, objective, tech stack and milestones into the project form. The user reviews and edits before saving; nothing is saved automatically | ✅ done. Chat with real tool calling, model menu (Groq, Gemini, Anthropic), connection test, AI project autofill, GitHub repo lookup and check-in/check-out planning. Run live on Groq and Gemini; Anthropic only against a fake server |
 | 7 | Weekly/monthly analytics, full test pass, persistence tests | ⏳ |
 | 8 | Docs: setup, deployment, Gmail/Claude/GitHub/n8n configuration | ⏳ |
 
@@ -556,7 +556,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Tests: backend `test_assistant.py` (38), `test_assistant_api.py` (27); frontend `assistant.test.tsx` (11) + `fakeAssistant.ts`. Frontend test stability: `testTimeout` 20s (vite.config.ts) and Testing Library `asyncUtilTimeout` 10s because the full suite
   (253 tests) is slow under parallel load; two long tests were flaking at the old limits.
 - **Later update (Phase 6 live testing).** Gemini was run live and Groq was added. Memory was REMOVED (service, `/ai/memories`, the `remember` tool, the UI card and the prompt notes; the old `ai_memories`
-  table is left in existing databases, unused), so there are now 15 tools (10 read, 5 write). New: `app/ai/groq.py` (OpenAI-style chat completions; tool results are `role: "tool"` messages), `app/ai/catalog.py`
+  table is left in existing databases, unused), so there are now 16 tools (11 read, 5 write; `look_up_github_repo` was added at the end of Phase 6). New: `app/ai/groq.py` (OpenAI-style chat completions; tool results are `role: "tool"` messages), `app/ai/catalog.py`
   (`GET /ai/models`: live model list for Groq and Gemini, cached 10 minutes, curated fallback, default always included), per-request `provider`/`model` on chat, check and autofill (only providers with a key,
   model names validated), `ToolCall.meta` (carries Gemini's `thoughtSignature`; stripped for Anthropic). Live findings: Gemini 3 models answer 400 on the second tool turn unless `thoughtSignature` is sent back; `gemini-2.5-flash`
   returned 404 although listed; the Gemini free tier allows ~5 requests a minute. Tests now force `AI_PROVIDER=none` and blank keys so a real `.env` can't leak in. Frontend: redesigned chat (bubbles, markdown renderer in

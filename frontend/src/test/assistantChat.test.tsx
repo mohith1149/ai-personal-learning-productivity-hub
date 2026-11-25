@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { setModelChoice } from "../api/assistant";
 import { parseBlocks } from "../components/Markdown";
+import { groupTurns } from "../pages/assistant/ChatCard";
 import { installFakeApi } from "./fakeApi";
 import { installFakeAssistant, type FakeAssistant } from "./fakeAssistant";
 import { renderAt } from "./render";
@@ -144,5 +145,56 @@ describe("markdown parsing", () => {
   it("does not choke on an unclosed code fence or unmatched bold markers", () => {
     expect(parseBlocks("```\nnever closed")).toEqual([{ kind: "code", text: "never closed" }]);
     expect(parseBlocks("a ** b")).toEqual([{ kind: "p", text: "a ** b" }]);
+  });
+});
+
+describe("check-in and check-out", () => {
+  it("sends the morning check-in and the evening check-out with one click each", async () => {
+    const { fake } = await open();
+    const chat = await chatCard();
+    await userEvent.click(await within(chat).findByRole("button", { name: "Morning check-in" }));
+    await waitFor(() => expect(fake.callsTo("POST", /ai\/chat$/)).toHaveLength(1));
+    expect(fake.callsTo("POST", /ai\/chat$/)[0].body).toMatchObject({ message: expect.stringMatching(/^Morning check-in/) });
+    await within(chat).findByText("You have 2 open tasks today.");
+    await userEvent.click(within(chat).getByRole("button", { name: "Evening check-out" }));
+    await waitFor(() => expect(fake.callsTo("POST", /ai\/chat$/)).toHaveLength(2));
+    expect(fake.callsTo("POST", /ai\/chat$/)[1].body).toMatchObject({ message: expect.stringMatching(/^Evening check-out/), conversation_id: 1 });
+  });
+});
+
+describe("one answer, one bubble", () => {
+  const m = (id: number, role: "user" | "assistant", text: string, tools: string[] = []) => ({ id, role, text, tool_calls: tools.map((name) => ({ name, input: {} })), created_at: "" });
+
+  it("merges the assistant's messages between two of yours and lists each lookup once", () => {
+    const turns = groupTurns([m(1, "user", "plan?"), m(2, "assistant", "Plan: a", ["get_plan"]), m(3, "assistant", "Overview: b", ["get_dashboard", "get_plan"]), m(4, "user", "thanks"), m(5, "assistant", "Welcome")]);
+    expect(turns).toEqual([
+      { id: 1, role: "user", text: "plan?" },
+      { id: 2, role: "assistant", text: "Plan: a\n\nOverview: b", tools: ["plan", "dashboard"] },
+      { id: 4, role: "user", text: "thanks" },
+      { id: 5, role: "assistant", text: "Welcome", tools: [] },
+    ]);
+  });
+
+  it("shows one bubble with all the lookups for a multi-step answer", async () => {
+    await open({ messages: [m(1, "user", "plan?"), m(2, "assistant", "", ["get_plan"]), m(3, "assistant", "You have 2 things.", ["get_dashboard"])] });
+    const chat = await chatCard();
+    // conversation is only fetched after the first send, so drive one
+    await userEvent.type(await within(chat).findByRole("textbox", { name: "Message" }), "go{Enter}");
+    const log = await within(chat).findByRole("log", { name: "Conversation" });
+    expect(await within(log).findByText("You have 2 open tasks today.")).toBeInTheDocument();
+    // two answers on screen (the seeded 2-step one and the new one) = two "Looked up" lines, not three (one per message)
+    expect(within(log).getAllByText("Looked up:")).toHaveLength(2);
+    expect(within(log).getAllByText("plan")).toHaveLength(1);
+  });
+});
+
+describe("tested-live badge", () => {
+  it("turns into Tested live after a passing connection test", async () => {
+    await open();
+    const s = await card("Assistant status");
+    expect(await within(s).findByText("Not tested live")).toBeInTheDocument();
+    await userEvent.click(within(s).getByRole("button", { name: "Test the connection" }));
+    expect(await within(s).findByText("Tested live")).toBeInTheDocument();
+    expect(within(s).queryByText("Not tested live")).not.toBeInTheDocument();
   });
 });

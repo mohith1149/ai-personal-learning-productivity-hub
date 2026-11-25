@@ -4,7 +4,7 @@ import json
 import httpx
 import pytest
 
-from app.ai import catalog, tools
+from app.ai import catalog, net, tools
 from app.ai.groq import GroqProvider
 from app.ai.providers import ScriptedProvider, get_provider
 from app.ai.types import LLMResponse, ProviderError
@@ -109,6 +109,45 @@ def test_network_failure_unreadable_answer_and_truncation():
         with pytest.raises(ProviderError, match="couldn't be read"):
             complete(groq(body=bad))
     assert complete(groq(body={"choices": [{"message": {"content": "cut"}, "finish_reason": "length"}]})).stop_reason == "max_tokens"
+
+
+@pytest.fixture(autouse=True)
+def _no_pause(monkeypatch):
+    monkeypatch.setattr(net, "PAUSE", 0)
+
+
+def flaky(fail_times, exc):
+    """A transport whose first `fail_times` connections fail, then works (like antivirus re-signing some HTTPS connections)."""
+    state = {"n": 0}
+
+    def handler(req: httpx.Request):
+        state["n"] += 1
+        if state["n"] <= fail_times:
+            raise exc
+        return httpx.Response(200, json=OK)
+    return GroqProvider(KEY, "m", httpx.Client(transport=httpx.MockTransport(handler))), state
+
+
+CERT = httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self signed certificate in certificate chain")
+
+
+def test_a_connection_that_fails_to_establish_is_retried_and_then_succeeds():
+    p, state = flaky(2, CERT)
+    assert complete(p).text == "Hi" and state["n"] == 3
+
+
+def test_a_persistent_certificate_failure_explains_itself_and_never_disables_checking():
+    p, state = flaky(99, CERT)
+    with pytest.raises(ProviderError, match="certificate check failed") as e:
+        complete(p)
+    assert state["n"] == net.ATTEMPTS and "Antivirus" in str(e.value) and "Couldn't reach the Groq API" in str(e.value)
+
+
+def test_only_connection_failures_are_retried_never_a_request_that_was_sent():
+    p, state = flaky(99, httpx.ReadTimeout("timed out"))
+    with pytest.raises(ProviderError, match="Couldn't reach"):
+        complete(p)
+    assert state["n"] == 1                                                                    # a timeout may mean the request ran: no retry
 
 
 # ------------------------------ choosing a model ------------------------------
