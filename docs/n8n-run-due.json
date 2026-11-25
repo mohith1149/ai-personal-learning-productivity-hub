@@ -1,0 +1,25 @@
+{
+  "name": "AI Learning Hub - send due e-mails",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 1 }] } },
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8000/api/automation/run-due",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-Automation-Key", "value": "PASTE_YOUR_AUTOMATION_API_KEY" }] }
+      },
+      "name": "Run due e-mails",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    }
+  ],
+  "connections": { "Every minute": { "main": [[{ "node": "Run due e-mails", "type": "main", "index": 0 }]] } }
+}

@@ -269,7 +269,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 | 2 | npm repair, git init, backend + frontend scaffolds, env config, SQLite, smoke test | ✅ done |
 | 3 | Auth ✅ · app shell ✅ · tasks ✅ · courses ✅ · video playlists ✅ · roadmap · habits · projects · daily challenge · planner · dashboard · AI foundation | 🚧 next: integration tests, docs, final verification |
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification (✅ verify button), calendar, repo sync; **plus** "import project from a GitHub repo" (no LLM: read repo name, description, languages, README and prefill the project form) | ✅ done (verify + import via public API / optional `GITHUB_TOKEN`). OAuth, repo sync and a separate commit calendar deliberately skipped: the challenge calendar already shows verified days |
-| 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ⏳ |
+| 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ✅ built and tested with a fake mail server; real SMTP send needs the owner's App Password. Gmail API not built |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning; **plus** "AI project autofill": give a repo URL or a description, the model reads it through a read-only tool and proposes title, description, objective, tech stack and milestones into the project form. The user reviews and edits before saving; nothing is saved automatically | ⏳ |
 | 7 | Weekly/monthly analytics, full test pass, persistence tests | ⏳ |
 | 8 | Docs: setup, deployment, Gmail/Claude/GitHub/n8n configuration | ⏳ |

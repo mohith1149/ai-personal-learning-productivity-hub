@@ -8,6 +8,8 @@ import { emptyDashboard } from "./fakeDashboard";
 export const USER = { id: 1, email: "me@example.com", display_name: "Ada Lovelace", timezone: "Asia/Kolkata" };
 export const TODAY = todayIn(USER.timezone);
 
+import { newFakeNotifications, notificationsHandler, type FakeNotifications } from "./fakeNotifications";
+
 export type Call = { method: string; path: string; query: Record<string, string>; body?: Record<string, unknown> };
 
 export type Req = { method: string; path: string; query: Record<string, string>; body?: Record<string, unknown> };
@@ -16,6 +18,7 @@ export type Handler = (req: Req) => Response | undefined;
 
 export type Fake = {
   handlers: Handler[];
+  notifications: FakeNotifications;
   tasks: Task[];
   categories: Category[];
   recurring: Recurring[];
@@ -90,10 +93,12 @@ export function installFakeApi(seed: { tasks?: Task[]; categories?: Category[]; 
     recurring: seed.recurring ?? [],
     calls: [],
     handlers: [],
+    notifications: newFakeNotifications(),
     failNext: () => {},
     callsTo: (method, re) => f.calls.filter((c) => c.method === method && re.test(c.path)),
   };
   f.handlers.push(({ method, path }) => (path === "/api/dashboard" && method === "GET" ? Response.json(emptyDashboard()) : undefined)); // default: a new, empty account
+  f.handlers.push(notificationsHandler(f.notifications));
   const failures: { match: RegExp; status: number; detail: string; left: number }[] = [];
   f.failNext = (match, status, detail, times = 1) => failures.push({ match, status, detail, left: times });
 

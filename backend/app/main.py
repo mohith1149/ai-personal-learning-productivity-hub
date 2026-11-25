@@ -28,7 +28,13 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     log.info("Starting %s (env=%s, scheduler=%s)", settings.app_name, settings.environment,
              settings.scheduler_mode)
+    sched = None
+    if settings.scheduler_mode == "internal" and settings.environment != "test":
+        from app import scheduler
+        sched = scheduler.start()
     yield
+    if sched:
+        sched.shutdown(wait=False)
 
 
 def create_app() -> FastAPI:
