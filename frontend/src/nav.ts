@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bot,
   CalendarCheck,
   CirclePlay,
@@ -91,6 +92,17 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/roadmap",
         label: "AI roadmap",
         icon: MapIcon,
+        status: "ready",
+      },
+    ],
+  },
+  {
+    heading: "Insights",
+    items: [
+      {
+        to: "/reports",
+        label: "Reports",
+        icon: BarChart3,
         status: "ready",
       },
     ],

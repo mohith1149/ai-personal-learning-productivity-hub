@@ -28,3 +28,38 @@ body {
   outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
 }
+
+/* Chart colours (see the data-viz palette). Fixed per entity so a colour never changes meaning between charts.
+   Light/dark are separate, validated steps of the same hues, not an automatic flip. --viz-surface matches the card the chart sits on. */
+.viz {
+  --viz-surface: #ffffff;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #6f6d67;
+  --viz-tasks: #2a78d6;
+  --viz-lessons: #eb6834;
+  --viz-videos: #1baf7a;
+  --viz-topics: #eda100;
+  --viz-study: #6250d6;
+  --viz-project: #e87ba4;
+  --viz-plan: #008300;
+  --viz-good: #0ca30c;
+  --viz-critical: #d03b3b;
+  --viz-up: #006300;
+}
+.dark .viz {
+  --viz-surface: #0f172a;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-muted: #a19f97;
+  --viz-tasks: #3987e5;
+  --viz-lessons: #d95926;
+  --viz-videos: #199e70;
+  --viz-topics: #c98500;
+  --viz-study: #9085e9;
+  --viz-project: #d55181;
+  --viz-plan: #0ca30c;
+  --viz-good: #0ca30c;
+  --viz-critical: #d03b3b;
+  --viz-up: #0ca30c;
+}

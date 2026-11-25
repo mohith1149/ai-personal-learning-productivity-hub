@@ -10,6 +10,7 @@ import { ChallengePage } from "./pages/challenge/ChallengePage";
 import { PlannerPage } from "./pages/planner/PlannerPage";
 import { ProjectDetailPage } from "./pages/projects/ProjectDetailPage";
 import { ProjectsPage } from "./pages/projects/ProjectsPage";
+import { ReportsPage } from "./pages/reports/ReportsPage";
 import { RoadmapPage } from "./pages/roadmap/RoadmapPage";
 import { TasksPage } from "./pages/tasks/TasksPage";
 import { VideosPage } from "./pages/videos/VideosPage";
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="habits" element={<HabitsPage />} />
         <Route path="planner" element={<PlannerPage />} />
         <Route path="challenge" element={<ChallengePage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="assistant" element={<AssistantPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />

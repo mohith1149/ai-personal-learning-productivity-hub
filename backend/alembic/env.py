@@ -12,6 +12,18 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+# Tables that exist in databases but no longer have a model. `ai_memories` belonged to the assistant's memory feature, which was removed;
+# the table is deliberately left in place (dropping it would delete the owner's saved notes), so `alembic check` must not report it as drift.
+RETIRED_TABLES = {"ai_memories"}
+
+
+def include_object(obj, name, type_, reflected, compare_to):
+    if type_ == "table" and name in RETIRED_TABLES:
+        return False
+    if type_ in ("index", "unique_constraint", "foreign_key_constraint") and getattr(getattr(obj, "table", None), "name", None) in RETIRED_TABLES:
+        return False
+    return True
+
 
 def run_migrations_offline() -> None:
     context.configure(
@@ -20,6 +32,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         render_as_batch=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -39,6 +52,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             render_as_batch=True,  # SQLite needs batch mode for ALTER TABLE
             compare_type=True,
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()
