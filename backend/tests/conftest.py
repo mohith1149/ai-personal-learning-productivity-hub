@@ -9,6 +9,10 @@ os.environ["DATABASE_URL"] = f"sqlite:///{(_tmp / 'test.db').as_posix()}"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["SCHEDULER_MODE"] = "off"
 os.environ["EMAIL_PROVIDER"] = "none"
+# The developer's real backend/.env must never leak into tests: AI off, no keys (a test must never call a live provider).
+os.environ["AI_PROVIDER"] = "none"
+for _k in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "GITHUB_TOKEN"):
+    os.environ[_k] = ""
 os.environ.setdefault("SECRET_KEY", "test-secret-key-test-secret-key-0123456789")
 
 import pytest  # noqa: E402
