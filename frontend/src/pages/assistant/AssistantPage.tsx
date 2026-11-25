@@ -4,6 +4,7 @@ import {
   useAddMemory,
   useAiStatus,
   useAiTools,
+  useCheckConnection,
   useApprove,
   useDeleteMemory,
   useMemories,
@@ -14,9 +15,11 @@ import {
 } from "../../api/assistant";
 import { FormError, SelectInput, TextInput } from "../../components/forms";
 import { Badge, Button, Card, ErrorNotice, PageHeader, Spinner } from "../../components/ui";
+import { ChatCard } from "./ChatCard";
 
 function StatusCard() {
   const status = useAiStatus();
+  const check = useCheckConnection();
   return (
     <Card aria-label="Assistant status">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Connection</h2>
@@ -32,10 +35,19 @@ function StatusCard() {
             {!status.data.live_verified && <Badge>Not tested live</Badge>}
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{status.data.message}</p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            The chat window arrives with the live Claude connection in a later phase. Until then this page shows what the assistant will be allowed to do, and it already
-            holds your memory and the approval queue.
-          </p>
+          {status.data.connected && (
+            <div className="mt-3">
+              <Button variant="secondary" loading={check.isPending} onClick={() => check.mutate()}>
+                Test the connection
+              </Button>
+              {check.data && (
+                <p role="status" className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
+                  {check.data.message} ({check.data.model})
+                </p>
+              )}
+              {check.error && <FormError message={check.error.message} />}
+            </div>
+          )}
         </>
       )}
     </Card>
@@ -188,12 +200,18 @@ function ToolsCard() {
   );
 }
 
+function ChatGate() {
+  const status = useAiStatus();
+  return status.data?.connected ? <ChatCard /> : null;
+}
+
 export function AssistantPage() {
   return (
     <>
-      <PageHeader title="AI assistant" description="The foundation for the assistant: what it may do, your approval queue and its memory." />
+      <PageHeader title="AI assistant" description="Chat with the assistant, review what it proposes, and manage its memory." />
       <div className="space-y-4">
         <StatusCard />
+        <ChatGate />
         <ApprovalsCard />
         <MemoryCard />
         <ToolsCard />

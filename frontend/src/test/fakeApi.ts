@@ -208,6 +208,8 @@ export function installFakeApi(seed: { tasks?: Task[]; categories?: Category[]; 
         const res = h({ method, path, query: Object.fromEntries(url.searchParams), body });
         if (res) return res;
       }
+      // Default for pages that only ask whether AI is on (e.g. the project form): AI is off. installFakeAssistant overrides this above.
+      if (method === "GET" && path === "/api/ai/status") return Response.json({ provider: "none", connected: false, model: null, live_verified: false, message: "AI is off." });
       throw new Error(`Unexpected request in test: ${key}`);
     }),
   );

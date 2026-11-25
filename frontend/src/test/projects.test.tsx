@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { addDays, todayIn } from "../lib/dates";
 import { installFakeApi, mkTask, USER } from "./fakeApi";
+import { installFakeAssistant } from "./fakeAssistant";
 import { installFakeProjects, mkProject, type FakeProjects } from "./fakeProjects";
 import { renderAt } from "./render";
 
@@ -112,6 +113,48 @@ describe("creating a project", () => {
     await userEvent.type(within(dialog).getByLabelText("GitHub repository"), "https://github.com/me/missing");
     await userEvent.click(within(dialog).getByRole("button", { name: "Fill from GitHub" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("GitHub has no repository");
+  });
+
+  const CONNECTED = { provider: "anthropic", connected: true, model: "claude-opus-5-5", live_verified: false, message: "configured" };
+
+  it("hides Suggest with AI when AI is off", async () => {
+    const { dialog } = await openForm();
+    expect(within(dialog).queryByRole("button", { name: "Suggest with AI" })).not.toBeInTheDocument();
+  });
+
+  it("suggests details with AI, fills only empty fields, and creates the kept milestones with the project", async () => {
+    const fake = installFakeApi();
+    installFakeAssistant(fake, { status: CONNECTED });
+    installFakeProjects(fake, { projects: [] });
+    renderAt("/projects");
+    await userEvent.click((await screen.findAllByRole("button", { name: "New project" }))[0]);
+    const dialog = await screen.findByRole("dialog", { name: "New project" });
+    await userEvent.type(within(dialog).getByLabelText("Description"), "My own words");
+    await userEvent.type(within(dialog).getByLabelText("GitHub repository"), "https://github.com/me/rag-bot");
+    await userEvent.click(await within(dialog).findByRole("button", { name: "Suggest with AI" }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Project name")).toHaveValue("RAG Bot"));
+    expect(within(dialog).getByLabelText("Description")).toHaveValue("My own words");          // typed text is never overwritten
+    expect(within(dialog).getByLabelText("Objective", { exact: false })).toHaveValue("Learn retrieval.");
+    expect(within(dialog).getByText(/It can be wrong/)).toBeInTheDocument();
+    expect(fake.callsTo("POST", /\/projects$/)).toHaveLength(0);                                // nothing saved yet
+    await userEvent.click(within(dialog).getByLabelText("Keep milestone: Build the index"));      // drop one idea
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create project" }));
+    await waitFor(() => expect(fake.callsTo("POST", /\/projects$/)).toHaveLength(1));
+    await waitFor(() => expect(fake.callsTo("POST", /milestones$/).map((c) => c.body)).toEqual([{ title: "Load documents" }]));
+  });
+
+  it("shows the AI's problem and asks for a source first", async () => {
+    const fake = installFakeApi();
+    installFakeAssistant(fake, { status: CONNECTED, autofillError: "The AI didn't return a usable suggestion. Try again" });
+    installFakeProjects(fake, { projects: [] });
+    renderAt("/projects");
+    await userEvent.click((await screen.findAllByRole("button", { name: "New project" }))[0]);
+    const dialog = await screen.findByRole("dialog", { name: "New project" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: "Suggest with AI" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Enter a GitHub link or a short description first");
+    await userEvent.type(within(dialog).getByLabelText("Description"), "A chatbot");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Suggest with AI" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("usable suggestion");
   });
 
   it("validates name, repository link and dates before sending anything", async () => {

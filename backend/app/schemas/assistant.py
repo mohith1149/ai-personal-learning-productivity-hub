@@ -1,5 +1,5 @@
 """Request/response models for the AI foundation endpoints."""
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -79,3 +79,28 @@ class ConversationOut(BaseModel):
     title: str
     messages: list[MessageOut]
     pending: list[PendingOut]
+
+
+class AutofillIn(Strict):
+    repo_url: str | None = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, max_length=4000)
+
+
+class AutofillOut(BaseModel):
+    """A suggestion only. Nothing is saved; the project form shows it for the user to edit."""
+    title: str
+    description: str | None
+    objective: str | None
+    tech_stack: list[str]
+    milestones: list[str]
+    repo_url: str | None
+    start_date: date | None
+    source: Literal["repo", "description", "repo_and_description"]
+    readme_used: bool
+
+
+class CheckOut(BaseModel):
+    ok: bool
+    provider: str
+    model: str
+    message: str
