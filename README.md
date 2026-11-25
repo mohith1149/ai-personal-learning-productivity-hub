@@ -15,7 +15,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 
 | Not built | Planned |
 |---|---|
-| Live AI assistant and chat window. The Anthropic adapter exists but has only been tested against a stub, never against the real API. The `/assistant` page shows this honestly. | Phase 6 |
+| Live use of the AI assistant. The chat window and the project autofill are built and tested against a scripted stand-in, but never against the real Anthropic API until you add a key (see below). Daily check-in/check-out planning is not built. | needs your API key |
 | GitHub account sign-in (OAuth) and repo sync. Not needed: verification and project import work on public repos with no account link, and `GITHUB_TOKEN` covers private ones. | not scheduled |
 | Gmail API (OAuth) sending. SMTP with an App Password is built and was tested with a real Gmail account and n8n. | not scheduled |
 | Weekly/monthly analytics | Phase 7 |
@@ -32,10 +32,10 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 | Videos | Collections with a daily target; paste links or import a YouTube playlist. Finished videos are never suggested again. |
 | AI roadmap | Your AI-engineering path as stages and topics. |
 | Habits | Daily/weekly habits with streaks. |
-| Projects | Projects, milestones, development sessions. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
+| Projects | Projects, milestones, development sessions. **Suggest with AI** (when a key is set) fills the empty fields and proposes milestones from a repo link and/or your description; you edit before creating. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
 | Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Settings | Your account (read-only), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
-| AI assistant | Foundation only: provider interface, 16 tools (10 read, 6 propose-only), approval queue, memory. No chat yet. |
+| AI assistant | Chat window (shown once a key is set), 16 tools (10 read, 6 propose-only), approval queue, memory, and a **Test the connection** button. The assistant cannot change anything itself. |
 
 ## Run it (Windows, development)
 
@@ -75,6 +75,18 @@ Restart the backend, open Settings, switch reminders on, press **Send a test e-m
 after the mail server accepted it, otherwise *Failed* with the reason. The built-in scheduler (`SCHEDULER_MODE=internal`, default)
 checks every minute; each e-mail goes out once per day (weekly report: once per week), and an empty plan sends nothing.
 To use n8n instead, set `SCHEDULER_MODE=n8n`, set `AUTOMATION_API_KEY`, and import `docs/n8n-run-due.json` (never run both). In n8n use `127.0.0.1`, not `localhost` (n8n resolves `localhost` to IPv6 and the backend listens on IPv4).
+
+## AI assistant (optional)
+
+Off until you add a key. In `backend/.env`:
+
+```
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=<your key from console.anthropic.com>
+```
+
+Restart the backend, open **AI assistant**, press **Test the connection** (a tiny real request, costs a few tokens). Only then does the
+chat window appear. Nothing the assistant proposes happens until you approve it. The key never leaves the backend.
 
 ## Tests
 

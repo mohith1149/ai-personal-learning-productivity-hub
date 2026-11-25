@@ -3,15 +3,18 @@
 Chat answers 503 until a provider is configured (AI_PROVIDER + key in backend/.env). Everything else works without one."""
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.ai import tools
 from app.ai.providers import get_provider
 from app.ai.types import ProviderError
 from app.config import get_settings
 from app.core.deps import CurrentUser, DbSession
+from app.routers.challenges import _GH_STATUS, get_github
 from app.schemas import assistant as s
 from app.services import ai_memory, assistant as svc
+from app.services import github as gh
+from app.services import project_autofill as autofill
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -48,6 +51,35 @@ def get_status(user: CurrentUser):
     msg = "AI is off. Set AI_PROVIDER=anthropic and ANTHROPIC_API_KEY in backend/.env to turn it on." if cfg.ai_provider == "none" else \
         "A provider is selected but its API key is missing in backend/.env."
     return {"provider": cfg.ai_provider, "connected": False, "model": None, "live_verified": False, "message": msg}
+
+
+@router.post("/check", response_model=s.CheckOut)
+def check_connection(user: CurrentUser):
+    """A real, tiny request to the provider so you can see whether the key works. Costs a few tokens; stores nothing."""
+    p = current_provider()
+    if p is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No AI provider is connected. Set AI_PROVIDER and a key in backend/.env")
+    try:
+        r = p.complete(system="Reply with the single word OK.", messages=[{"role": "user", "content": [{"type": "text", "text": "ping"}]}], tools=[])
+    except ProviderError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from None
+    return {"ok": bool(r.text.strip()), "provider": p.name, "model": p.model, "message": "The provider answered. The connection works."}
+
+
+@router.post("/project-autofill", response_model=s.AutofillOut)
+def project_autofill(body: s.AutofillIn, user: CurrentUser, client: Annotated[gh.GitHubClient, Depends(get_github)]):
+    """Suggest project fields from a GitHub repo and/or a description. Read-only: nothing is saved."""
+    p = current_provider()
+    if p is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No AI provider is connected. Set AI_PROVIDER and a key in backend/.env")
+    try:
+        return autofill.suggest(p, client, body.repo_url, body.description)
+    except autofill.AutofillError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+    except gh.GitHubError as e:
+        raise HTTPException(_GH_STATUS.get(e.code, 502), e.message) from None
+    except ProviderError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from None
 
 
 @router.get("/tools", response_model=list[s.ToolOut])

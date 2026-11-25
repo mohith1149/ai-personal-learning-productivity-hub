@@ -22,8 +22,8 @@ describe("AI assistant", () => {
     expect(await within(s).findByText("Not connected")).toBeInTheDocument();
     expect(within(s).getByText("Not tested live")).toBeInTheDocument();
     expect(within(s).getByText(/AI is off/)).toBeInTheDocument();
-    expect(within(s).getByText(/chat window arrives with the live Claude connection/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /message/i })).not.toBeInTheDocument();       // no pretend chat box
+    expect(screen.queryByRole("textbox", { name: /message/i })).not.toBeInTheDocument();       // no pretend chat box when nothing is connected
+    expect(within(s).queryByRole("button", { name: "Test the connection" })).not.toBeInTheDocument();
   });
 
   it("shows a configured provider as configured but still untested", async () => {
@@ -125,5 +125,34 @@ describe("AI assistant", () => {
     await open();
     expect(screen.queryByText("Not built yet")).not.toBeInTheDocument();
     expect(within(await screen.findByRole("navigation", { name: "Main" })).getByRole("link", { name: /AI assistant/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  const CONNECTED = { provider: "anthropic", connected: true, model: "claude-opus-5-5", live_verified: false, message: "A provider is configured, but the live connection has not been tested yet." };
+
+  it("tests the connection on request and shows the real result", async () => {
+    await open({ status: CONNECTED });
+    const s = await card("Assistant status");
+    await userEvent.click(await within(s).findByRole("button", { name: "Test the connection" }));
+    expect(await within(s).findByText(/The connection works/)).toBeInTheDocument();
+  });
+
+  it("chats: shows your message, the reply and what was looked up", async () => {
+    await open({ status: CONNECTED });
+    const chat = await card("Chat");
+    await userEvent.type(await within(chat).findByRole("textbox", { name: "Message" }), "What is on today?");
+    await userEvent.click(within(chat).getByRole("button", { name: "Send" }));
+    const log = await within(chat).findByRole("log", { name: "Conversation" });
+    expect(await within(log).findByText("What is on today?")).toBeInTheDocument();
+    expect(await within(log).findByText("You have 2 open tasks today.")).toBeInTheDocument();
+    expect(within(log).getByText(/Looked up: get_today_tasks/)).toBeInTheDocument();
+  });
+
+  it("says nothing has changed when the assistant proposes something, and lists it for approval", async () => {
+    await open({ status: CONNECTED, chatProposals: 1 });
+    const chat = await card("Chat");
+    await userEvent.type(await within(chat).findByRole("textbox", { name: "Message" }), "Add a task");
+    await userEvent.click(within(chat).getByRole("button", { name: "Send" }));
+    expect(await within(chat).findByText(/Nothing has changed yet/)).toBeInTheDocument();
+    expect(await within(await card("Waiting for approval")).findByRole("list", { name: "Proposals" })).toBeInTheDocument();
   });
 });
