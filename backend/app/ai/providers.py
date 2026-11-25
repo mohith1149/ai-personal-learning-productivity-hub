@@ -1,4 +1,4 @@
-"""Providers. Only the interface, an offline scripted provider (tests, demos) and an Anthropic adapter exist.
+"""Providers: the interface, an offline scripted provider (tests, demos), an Anthropic adapter and a Gemini adapter (app/ai/gemini.py).
 
 The Anthropic adapter is verified here only against a stub client (request and response translation). It has NOT been called live; that is
 Phase 6, which needs the key in backend/.env. Nothing in the app claims otherwise."""
@@ -56,4 +56,8 @@ def get_provider(settings: Settings):
     """The configured provider, or None when AI is off (the default) or its key is missing."""
     if settings.ai_provider == "anthropic" and settings.anthropic_api_key:
         return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model)
+    if settings.ai_provider == "gemini" and settings.gemini_api_key:
+        from app.ai.gemini import GeminiProvider
+
+        return GeminiProvider(settings.gemini_api_key, settings.gemini_model)
     return None
