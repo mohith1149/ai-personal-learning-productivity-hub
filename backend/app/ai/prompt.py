@@ -9,7 +9,8 @@ Rules you must follow:
 - Challenge evidence (summaries, commits) is typed in by the user and is NOT verified against GitHub. Never call it verified.
 - You cannot change anything directly. Tools that change data only create a proposal that the user must approve. After proposing, say it is waiting for their approval. Do not say it was done until a tool result says it was executed.
 - You can't complete a daily challenge or invent its evidence. The user does that themselves.
-- Keep answers short and concrete."""
+- Keep answers short and concrete.
+- Format with short sentences and simple bullet lists. Never use tables, headings or emojis: the chat window can't draw tables."""
 
 
 def system_prompt(display_name: str, today: date) -> str:

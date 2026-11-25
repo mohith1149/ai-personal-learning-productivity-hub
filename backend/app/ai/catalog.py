@@ -11,13 +11,13 @@ from app.config import Settings
 
 LABELS = {"groq": "Groq (free)", "gemini": "Google Gemini (free tier)", "anthropic": "Anthropic Claude (paid)"}
 CURATED = {
-    "groq": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
+    "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"],
     "gemini": ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro"],
     "anthropic": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
 }
 # Models in a provider's list that cannot chat with tools (speech, images, safety classifiers, embeddings...).
 _NOT_CHAT = ("whisper", "tts", "guard", "orpheus", "embed", "safeguard", "image", "transcribe", "lyria", "robotics", "computer-use", "antigravity",
-             "research", "nano-banana", "omni", "live", "audio", "gemma", "compound")
+             "research", "nano-banana", "omni", "live", "audio", "gemma", "compound", "allam")
 MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,99}$")
 _TTL = 600.0
 _cache: dict[str, tuple[float, list[str]]] = {}
