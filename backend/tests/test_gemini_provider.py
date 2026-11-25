@@ -113,4 +113,4 @@ def test_get_provider_selects_gemini_only_with_both_the_setting_and_a_key():
     assert get_provider(Settings(**base, ai_provider="gemini", gemini_api_key=KEY)).name == "gemini"
     assert get_provider(Settings(**base, ai_provider="gemini")) is None                       # key missing
     assert get_provider(Settings(**base, ai_provider="none", gemini_api_key=KEY)) is None      # a key alone never turns AI on
-    assert get_provider(Settings(**base, ai_provider="gemini", gemini_api_key=KEY)).model == "gemini-2.5-flash"
+    assert get_provider(Settings(**base, ai_provider="gemini", gemini_api_key=KEY)).model == "gemini-3.5-flash"
