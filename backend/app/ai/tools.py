@@ -19,7 +19,7 @@ from app.schemas import challenges as chs
 from app.schemas import planner as pls
 from app.schemas import projects as pjs
 from app.schemas import tasks as tks
-from app.services import challenges, courses, dashboard, habits, planner, projects, roadmap, tasks
+from app.services import challenges, courses, dashboard, habits, planner, projects, reports, roadmap, tasks
 from app.services import github as gh
 
 MAX_ITEMS = 40
@@ -35,6 +35,10 @@ class NoArgs(Args):
 
 class OptionalDay(Args):
     day: date | None = Field(default=None, description="The day to show (YYYY-MM-DD). Defaults to today.")
+
+
+class WeekOf(Args):
+    day: date | None = Field(default=None, description="Any day in the week you want (YYYY-MM-DD). Defaults to this week.")
 
 
 class RepoLookup(Args):
@@ -142,6 +146,13 @@ def _challenge(db, user, _):
             "note": "Evidence is entered by the user and is not verified against GitHub."}
 
 
+def _weekly_report(db, user, a: WeekOf):
+    r = reports.weekly(db, user, a.day)
+    keep = ("date", "items_done", "study_minutes", "project_minutes", "habits_done", "challenge", "plan_total", "plan_completed")
+    return {"period": r["period"]["label"], "totals": r["totals"], "same_days_last_period": r["previous"], "plan": r["plan"], "challenge": r["challenge"],
+            "per_day": [{k: d[k] for k in keep} for d in r["days"]], "projects": r["projects"], "habits": r["habits"]}
+
+
 def github_client() -> gh.GitHubClient:
     """A function so tests can swap in a fake. Public repos need no token; GITHUB_TOKEN (backend only) adds private ones."""
     return gh.GitHubClient(get_settings().github_token or None)
@@ -199,6 +210,7 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("get_roadmap_progress", "Progress through the AI learning roadmap and the next topic.", "read", NoArgs, _roadmap),
     Tool("get_habit_status", "Habits with today's status and streaks.", "read", NoArgs, _habits),
     Tool("get_challenge_status", "Today's daily project challenge, streaks and missed days. Evidence is self-reported and unverified.", "read", NoArgs, _challenge),
+    Tool("get_weekly_report", "A Monday-to-Sunday report: items finished, study and project minutes, habit check-ins, plan completion and the challenge, per day and in total, compared with the same days of the previous week.", "read", WeekOf, _weekly_report),
     Tool("look_up_github_repo", "Read a public GitHub repository (description, topics, languages, README start) from its link. Read-only.", "read", RepoLookup, _look_up_repo),
     Tool("create_task", "Propose a new task. The user must approve it before it is created.", "write", tks.TaskCreate, _create_task, _task_line),
     Tool("complete_task", "Propose marking a task completed. The user must approve it.", "write", CompleteTask, _complete_task, lambda a: f"Mark task #{a.task_id} as completed"),

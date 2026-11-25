@@ -3,8 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4, 5 and 6 complete (Phase 6 run live on Groq and Gemini). Phase 7 (analytics, full test pass) and Phase 8 (docs) remain.
-
+Last updated: 2026-11-25 — Phases 4, 5, 6 and 7 complete. Phase 8 (docs) remains.
 ---
 
 ## 1. Purpose
@@ -236,7 +235,7 @@ Status legend: ✅ implemented & tested · 🚧 in progress · ⏳ planned
 | Notifications | `GET /notifications`, `POST /notifications/test`, `GET /notifications/preview/daily-plan`, `POST /notifications/run/{type}` | ⏳ |
 | Automation (n8n) | `POST /automation/daily-plan`, `/overdue`, `/weekly-report`, `/close-day` (header `X-Automation-Key`) | ⏳ |
 | Assistant | `GET/POST /assistant/conversations`, `GET /assistant/conversations/{id}`, `POST /assistant/conversations/{id}/messages`, `POST /assistant/actions/{id}/approve`, `/reject` | ⏳ |
-| Reports | `GET /reports/weekly?week_start`, `GET /reports/monthly?month`, `POST /reports/weekly/generate` | ⏳ |
+| Reports | `GET /reports/weekly?week_start` (any day in the week; Monday to Sunday), `GET /reports/monthly?month=YYYY-MM` | ✅ (`POST /reports/weekly/generate` not needed: the weekly e-mail already exists) |
 | Export | `GET /export` (full JSON export) | ⏳ |
 
 ## 7. AI tool-calling design
@@ -271,7 +270,7 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 | 4 | Daily AI Engineering Challenge, GitHub OAuth/PAT, commit verification (✅ verify button), calendar, repo sync; **plus** "import project from a GitHub repo" (no LLM: read repo name, description, languages, README and prefill the project form) | ✅ done (verify + import via public API / optional `GITHUB_TOKEN`). OAuth, repo sync and a separate commit calendar deliberately skipped: the challenge calendar already shows verified days |
 | 5 | Email (SMTP/Gmail), daily/overdue/weekly, scheduler, n8n workflows | ✅ built and tested with a fake mail server; real SMTP send needs the owner's App Password. Gmail API not built |
 | 6 | Claude assistant, tool calling, confirmations, recommendations, check-in/out planning; **plus** "AI project autofill": give a repo URL or a description, the model reads it through a read-only tool and proposes title, description, objective, tech stack and milestones into the project form. The user reviews and edits before saving; nothing is saved automatically | ✅ done. Chat with real tool calling, model menu (Groq, Gemini, Anthropic), connection test, AI project autofill, GitHub repo lookup and check-in/check-out planning. Run live on Groq and Gemini; Anthropic only against a fake server |
-| 7 | Weekly/monthly analytics, full test pass, persistence tests | ⏳ |
+| 7 | Weekly/monthly analytics, full test pass, persistence tests | ✅ done. `GET /reports/weekly`, `/reports/monthly`, the Reports page (charts + table view), restart/crash persistence tests, migration-drift check |
 | 8 | Docs: setup, deployment, Gmail/Claude/GitHub/n8n configuration | ⏳ |
 
 ## 10. Implemented so far
@@ -561,6 +560,8 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
   model names validated), `ToolCall.meta` (carries Gemini's `thoughtSignature`; stripped for Anthropic). Live findings: Gemini 3 models answer 400 on the second tool turn unless `thoughtSignature` is sent back; `gemini-2.5-flash`
   returned 404 although listed; the Gemini free tier allows ~5 requests a minute. Tests now force `AI_PROVIDER=none` and blank keys so a real `.env` can't leak in. Frontend: redesigned chat (bubbles, markdown renderer in
   `components/Markdown.tsx` that never injects HTML, suggestion chips, Enter to send, typing indicator, optimistic message) and a model menu remembered in localStorage (`hub.ai-model`). Groq is tested only against fake HTTP.
+- **Phase 7 (reports, persistence).** `services/reports.py` + `routers/reports.py` + `schemas/reports.py`: per-day counts of finished tasks, lessons, videos and roadmap topics (grouped by the USER's local calendar day, not UTC), study and project minutes, habit check-ins, the daily-challenge status and the planner's own planned/completed figures; totals; a like-for-like comparison with the first N days of the previous period (N = days that have happened); top projects by time; habits. Days that have not happened yet show no activity and are left out of the plan percentage. The assistant has a matching read tool `get_weekly_report`. Frontend `/reports`: Week/Month, previous/next, KPI tiles with wording deltas, four charts hand-built in HTML (thin bars, rounded data end, 2px gap, hairline grid, legend for 2+ series, per-day hover/focus tooltip, a Charts/Tables switch so every value is readable without colour), colour tokens `--viz-*` in `index.css` (light and dark validated with the dataviz validator; light-mode yellow/aqua/magenta are under 3:1, so the table view is the required relief).
+- **Persistence tests** (`tests/test_persistence.py`) start the REAL server on a database file: data and login survive a hard kill and a clean restart, a signed-out cookie stays dead, a copied database file is a complete backup, `alembic upgrade head` works on an empty file and twice, and `alembic check` finds no drift between models and migrations. `alembic/env.py` ignores the retired `ai_memories` table on purpose (dropping it would delete the owner's saved note).
 - Not built: chat UI and live provider (Phase 6), OpenAI/Gemini adapters, weekly report tool, GitHub commit tool (Phase 4), streaming, conversation memory summarisation, notifying the model when a proposal is approved.
 
 ### Phase 3 verification pass (branch `feat/phase3-verification`)
