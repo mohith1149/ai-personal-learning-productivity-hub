@@ -20,6 +20,9 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 
 ERRORS = (svc.NotFound, svc.RuleError, svc.Conflict)
 
+# (provider, model) pairs that answered a real "Test the connection" since the backend started. In memory only: a restart honestly resets it.
+_verified: set[tuple[str, str]] = set()
+
 
 def _http(exc: Exception) -> HTTPException:
     if isinstance(exc, svc.NotFound):
@@ -54,8 +57,9 @@ def get_status(user: CurrentUser):
     cfg = get_settings()
     p = current_provider()
     if p is not None:
-        return {"provider": p.name, "connected": True, "model": p.model, "live_verified": False,
-                "message": "A provider is configured, but the live connection has not been tested yet."}
+        ok = (p.name, p.model) in _verified
+        return {"provider": p.name, "connected": True, "model": p.model, "live_verified": ok,
+                "message": "The connection was tested and works." if ok else "A provider is configured, but the live connection has not been tested yet."}
     msg = "AI is off. Set AI_PROVIDER=groq and GROQ_API_KEY in backend/.env to turn it on (Groq has a free tier)." if cfg.ai_provider == "none" else \
         "A provider is selected but its API key is missing in backend/.env."
     return {"provider": cfg.ai_provider, "connected": False, "model": None, "live_verified": False, "message": msg}
@@ -80,7 +84,10 @@ def check_connection(user: CurrentUser, body: s.ModelChoice | None = None):
         r = p.complete(system="Reply with the single word OK.", messages=[{"role": "user", "content": [{"type": "text", "text": "ping"}]}], tools=[])
     except ProviderError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from None
-    return {"ok": bool(r.text.strip()), "provider": p.name, "model": p.model, "message": "The provider answered. The connection works."}
+    ok = bool(r.text.strip())
+    if ok:
+        _verified.add((p.name, p.model))
+    return {"ok": ok, "provider": p.name, "model": p.model, "message": "The provider answered. The connection works." if ok else "The provider answered with nothing. Try another model"}
 
 
 @router.post("/project-autofill", response_model=s.AutofillOut)

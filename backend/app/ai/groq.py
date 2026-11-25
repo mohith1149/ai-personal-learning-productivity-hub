@@ -9,6 +9,7 @@ import json
 
 import httpx
 
+from app.ai import net
 from app.ai.gemini import to_gemini_schema
 from app.ai.types import LLMResponse, ProviderError, ToolCall
 
@@ -70,10 +71,7 @@ class GroqProvider:
         if tools:
             body["tools"] = _tools(tools)
             body["tool_choice"] = "auto"
-        try:
-            r = self._http.post(f"{API_BASE}/chat/completions", json=body, headers={"Authorization": f"Bearer {self._key}"})
-        except httpx.HTTPError:
-            raise ProviderError("Couldn't reach the Groq API. Check your connection") from None
+        r = net.post(self._http, f"{API_BASE}/chat/completions", "Groq", json=body, headers={"Authorization": f"Bearer {self._key}"})
         if r.status_code != 200:
             raise ProviderError(self._explain(r))
         try:

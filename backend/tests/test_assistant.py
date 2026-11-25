@@ -60,7 +60,7 @@ def test_the_tool_set_is_exactly_what_the_design_allows():
     reads = {n for n, t in tools.TOOLS.items() if t.kind == "read"}
     writes = {n for n, t in tools.TOOLS.items() if t.kind == "write"}
     assert reads == {"get_today_tasks", "get_pending_tasks", "get_plan", "get_dashboard", "get_course_progress", "get_next_video", "get_active_projects",
-                     "get_roadmap_progress", "get_habit_status", "get_challenge_status"}
+                     "get_roadmap_progress", "get_habit_status", "get_challenge_status", "look_up_github_repo"}
     assert writes == {"create_task", "complete_task", "reschedule_task", "record_project_progress", "create_project_challenge"}
     assert "complete_challenge" not in tools.TOOLS          # evidence must come from the user, never the model
 
@@ -101,7 +101,7 @@ def test_tools_only_see_the_signed_in_users_data(db, user, other):
     assert "Mine" in contents and "Secret" not in contents
 
 
-@pytest.mark.parametrize("name", [n for n, t in tools.TOOLS.items() if t.kind == "read"])
+@pytest.mark.parametrize("name", [n for n, t in tools.TOOLS.items() if t.kind == "read" and not t.spec()["input_schema"].get("required")])  # the GitHub lookup needs a link
 def test_every_read_tool_runs_on_an_empty_account(db, user, name):
     p = ScriptedProvider([ask(call(name)), say("done")])
     chat(db, user, p)

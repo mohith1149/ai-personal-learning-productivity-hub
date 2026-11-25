@@ -56,7 +56,14 @@ export const useChat = () =>
     api<ChatReply>("/ai/chat", { method: "POST", body: { message, conversation_id, ...currentChoice() } }),
   );
 
-export const useCheckConnection = () => useMutation({ mutationFn: () => api<CheckResult>("/ai/check", { method: "POST", body: currentChoice() }) });
+export const useCheckConnection = () => {
+  const qc = useQueryClient();
+  // a passing test flips the status badge to "tested", so the status is refetched
+  return useMutation({
+    mutationFn: () => api<CheckResult>("/ai/check", { method: "POST", body: currentChoice() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...ROOT, "status"] }),
+  });
+};
 
 /** Suggests project fields. Saves nothing. */
 export const useAutofill = () =>

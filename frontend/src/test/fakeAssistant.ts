@@ -39,7 +39,10 @@ export function installFakeAssistant(fake: Fake, seed: Partial<FakeAssistant> = 
     if (path === "/api/ai/status") return json(store.status);
     if (path === "/api/ai/tools") return json(store.tools);
     if (path === "/api/ai/models") return json(store.models);
-    if (path === "/api/ai/check" && method === "POST") return json({ ok: true, provider: "groq", model: (body as { model?: string } | undefined)?.model ?? "llama-3.3-70b-versatile", message: "The provider answered. The connection works." });
+    if (path === "/api/ai/check" && method === "POST") {
+      store.status = { ...store.status, live_verified: true, message: "The connection was tested and works." };
+      return json({ ok: true, provider: "groq", model: (body as { model?: string } | undefined)?.model ?? "llama-3.3-70b-versatile", message: "The provider answered. The connection works." });
+    }
     if (path === "/api/ai/project-autofill" && method === "POST") return store.autofillError ? json({ detail: store.autofillError }, 422) : json(store.autofill);
     if (path === "/api/ai/chat" && method === "POST") {
       const b = body as { message: string };
