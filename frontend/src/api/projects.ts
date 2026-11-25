@@ -122,3 +122,7 @@ export const useLogSession = () =>
   useInvalidating(({ projectId, body }: { projectId: number; body: { minutes: number; summary: string; date?: string; milestone_id?: number | null; task_id?: number | null; notes?: string | null } }) =>
     api<DevSession>(`/projects/${projectId}/sessions`, { method: "POST", body }));
 export const useDeleteSession = () => useInvalidating((id: number) => api<void>(`/project-sessions/${id}`, { method: "DELETE" }));
+
+export type RepoPreview = { title: string; description: string | null; tech_stack: string[]; repo_url: string; start_date: string | null; readme_found: boolean };
+/** Reads a GitHub repo and suggests form values. Saves nothing. */
+export const useRepoPreview = () => useMutation({ mutationFn: (repo_url: string) => api<RepoPreview>("/github/repo-preview", { method: "POST", body: { repo_url } }) });

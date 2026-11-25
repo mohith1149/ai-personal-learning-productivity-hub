@@ -11,6 +11,7 @@ import {
   usePlanChallenge,
   useStartChallenge,
   useToday,
+  useVerifyChallenge,
   type CalendarDay,
   type CalendarStatus,
   type Challenge,
@@ -250,6 +251,29 @@ function ExcuseModal({ date, onClose }: { date: string; onClose: () => void }) {
 
 // ---------------------------------------------------------------- today
 
+function VerifyBox({ c }: { c: Challenge }) {
+  const verify = useVerifyChallenge();
+  if (c.verification_status === "verified")
+    return <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">Verified on GitHub: the commit exists, matches your message, was made that day and changes code.</p>;
+  return (
+    <div className="mt-3">
+      <Button variant="secondary" loading={verify.isPending} onClick={() => verify.mutate(c.id)}>
+        Verify on GitHub
+      </Button>
+      {verify.error && <ErrorNotice error={verify.error} />}
+      {verify.data && !verify.data.verified && (
+        <ul className="mt-2 space-y-1 text-sm" aria-label="Verification checks">
+          {verify.data.checks.map((k) => (
+            <li key={k.name} className={k.ok ? "text-slate-600 dark:text-slate-400" : "text-red-700 dark:text-red-400"}>
+              {k.ok ? "Passed" : "Failed"}: {k.name}. {k.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function Evidence({ c }: { c: Challenge }) {
   return (
     <dl className="mt-3 space-y-2 text-sm">
@@ -273,6 +297,7 @@ function Evidence({ c }: { c: Challenge }) {
         {c.milestone && <span>Milestone: {c.milestone.title}</span>}
       </div>
       {c.evidence_notes && <p className="text-slate-600 dark:text-slate-400">{c.evidence_notes}</p>}
+      <VerifyBox c={c} />
     </dl>
   );
 }

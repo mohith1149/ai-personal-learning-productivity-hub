@@ -361,3 +361,34 @@ def excuse_day(db: Session, user: User, data: s.ExcuseIn, now: datetime | None =
     c.status, c.excuse_reason = "excused", data.reason.strip()
     db.commit()
     return _out(c, today)
+
+
+# ============================== GitHub verification ==============================
+
+
+def verify_challenge(db: Session, user: User, challenge_id: int, client, now: datetime | None = None) -> dict:
+    """Check the stored commit against GitHub. Only a pass flips `verification_status` to 'verified'; a failed check
+    changes nothing (the day stays completed but unverified) and says which check failed. `client` is a GitHubClient."""
+    now = now or datetime.now(timezone.utc)
+    c, today = _get(db, user, challenge_id), user_today(user, now)
+    if c.status != "completed" or not c.commit_sha or not c.repo_url:
+        raise RuleError("Only a completed challenge with a commit can be verified")
+    info = client.get_commit(c.repo_url, c.commit_sha)  # GitHubError propagates; the router maps it
+    checks = [{"name": "Commit exists", "ok": True, "detail": f"Found {info.sha[:10]} in {c.repo_url.removeprefix('https://github.com/')}"}]
+    first_line = info.message.strip().splitlines()[0].strip().lower() if info.message.strip() else ""
+    mine = c.commit_message.strip().splitlines()[0].strip().lower()
+    checks.append({"name": "Message matches", "ok": bool(first_line) and (mine in first_line or first_line in mine),
+                   "detail": "The commit message matches what you entered" if mine in first_line or first_line in mine
+                   else f'GitHub says: "{info.message.strip().splitlines()[0][:80] if info.message.strip() else ""}"'})
+    window_ok = info.committed_at is not None and c.date - timedelta(days=1) <= info.committed_at.date() <= c.date + timedelta(days=1)
+    checks.append({"name": "Made on the day", "ok": window_ok,
+                   "detail": "Committed within a day of the challenge date" if window_ok
+                   else f"Committed {info.committed_at.date().isoformat() if info.committed_at else 'at an unknown time'}, the challenge is for {c.date.isoformat()}"})
+    changed = info.files_changed > 0 or info.additions + info.deletions > 0
+    checks.append({"name": "Changes code", "ok": changed,
+                   "detail": f"{info.files_changed} file(s), +{info.additions} -{info.deletions}" if changed else "The commit changes no files"})
+    ok = all(k["ok"] for k in checks)
+    if ok:
+        c.commit_sha, c.verification_status = info.sha, "verified"
+        db.commit()
+    return {"verified": ok, "checks": checks, "challenge": _out(c, today)}

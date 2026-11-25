@@ -94,6 +94,26 @@ describe("creating a project", () => {
     return { ...s, dialog: await screen.findByRole("dialog", { name: "New project" }) };
   }
 
+  it("fills only the empty fields from a GitHub repo, keeps what you typed, and saves nothing yet", async () => {
+    const { fake, dialog } = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Description"), "My own words");
+    await userEvent.type(within(dialog).getByLabelText("GitHub repository"), "https://github.com/me/rag-bot");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Fill from GitHub" }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Project name")).toHaveValue("rag-bot"));
+    expect(within(dialog).getByLabelText("Description")).toHaveValue("My own words");
+    expect(within(dialog).getByLabelText(/Technology stack/)).toHaveValue("Python, TypeScript");
+    expect(fake.callsTo("POST", /\/projects$/)).toHaveLength(0);
+  });
+
+  it("shows GitHub's problem and asks for a link first when none is entered", async () => {
+    const { dialog } = await openForm();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Fill from GitHub" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Enter a GitHub link");
+    await userEvent.type(within(dialog).getByLabelText("GitHub repository"), "https://github.com/me/missing");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Fill from GitHub" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("GitHub has no repository");
+  });
+
   it("validates name, repository link and dates before sending anything", async () => {
     const { fake, dialog } = await openForm();
     await userEvent.click(within(dialog).getByRole("button", { name: "Create project" }));

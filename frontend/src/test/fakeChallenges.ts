@@ -4,7 +4,7 @@ import type { CalendarDay, Challenge, Stats, Suggestion } from "../api/challenge
 import { addDays, todayIn } from "../lib/dates";
 import { USER, type Fake, type Handler } from "./fakeApi";
 
-export type FakeChallenges = { challenges: Challenge[]; suggestions: Suggestion[]; stats: Partial<Stats> };
+export type FakeChallenges = { challenges: Challenge[]; suggestions: Suggestion[]; stats: Partial<Stats>; verifyOk: boolean };
 
 let nextId = 9000;
 
@@ -19,7 +19,7 @@ export function mkChallenge(o: Partial<Challenge> = {}): Challenge {
 }
 
 export function installFakeChallenges(fake: Fake, seed: Partial<FakeChallenges> = {}): FakeChallenges {
-  const store: FakeChallenges = { challenges: seed.challenges ?? [], suggestions: seed.suggestions ?? [], stats: seed.stats ?? {} };
+  const store: FakeChallenges = { challenges: seed.challenges ?? [], suggestions: seed.suggestions ?? [], stats: seed.stats ?? {}, verifyOk: seed.verifyOk ?? true };
   const json = (d: unknown, status = 200) => Response.json(d, { status });
   const today = () => todayIn(USER.timezone);
 
@@ -64,11 +64,19 @@ export function installFakeChallenges(fake: Fake, seed: Partial<FakeChallenges> 
       Object.assign(c, { status: "excused", excuse_reason: b.reason, can_complete: false, can_edit: false });
       return json(c);
     }
-    const m = path.match(/^\/api\/challenges\/(\d+)(?:\/(start|complete))?$/);
+    const m = path.match(/^\/api\/challenges\/(\d+)(?:\/(start|complete|verify))?$/);
     if (m) {
       const c = store.challenges.find((x) => x.id === Number(m[1]));
       if (!c) return json({ detail: "Challenge not found" }, 404);
       if (m[2] === "start" && method === "POST") return json(Object.assign(c, { status: "in_progress" }));
+      if (m[2] === "verify" && method === "POST") {
+        if (store.verifyOk) c.verification_status = "verified";
+        return json({
+          verified: store.verifyOk,
+          checks: [{ name: "Commit exists", ok: true, detail: "Found it" }, { name: "Message matches", ok: store.verifyOk, detail: 'GitHub says: "other"' }],
+          challenge: c,
+        });
+      }
       if (m[2] === "complete" && method === "POST") {
         const b = body as Record<string, unknown>;
         Object.assign(c, {

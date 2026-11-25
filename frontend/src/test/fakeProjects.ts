@@ -53,6 +53,11 @@ export function installFakeProjects(fake: Fake, seed: Partial<FakeProjects> = {}
   const NF = () => json({ detail: "Project not found" }, 404);
 
   const handler: Handler = ({ method, path, query, body }) => {
+    if (method === "POST" && path === "/api/github/repo-preview") {
+      const url = (body as { repo_url: string }).repo_url;
+      if (url.endsWith("/missing")) return json({ detail: "GitHub has no repository in me/missing" }, 404);
+      return json({ title: "rag-bot", description: "A RAG chatbot.", tech_stack: ["Python", "TypeScript"], repo_url: url, start_date: "2025-03-04", readme_found: true });
+    }
     let m: RegExpMatchArray | null;
     if (path === "/api/projects" && method === "GET") return json(store.projects.filter((p) => !query.status || p.status === query.status).map(summary));
     if (path === "/api/projects" && method === "POST") {

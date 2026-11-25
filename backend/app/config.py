@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     # GitHub
     github_client_id: str | None = None
     github_client_secret: str | None = None
+    github_token: str | None = None  # optional PAT: private repos and a higher rate limit; backend only
 
     # Anthropic
     youtube_api_key: str | None = None  # YouTube Data API v3 key; backend only, never sent to the browser

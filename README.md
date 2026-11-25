@@ -16,7 +16,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 | Not built | Planned |
 |---|---|
 | Live AI assistant and chat window. The Anthropic adapter exists but has only been tested against a stub, never against the real API. The `/assistant` page shows this honestly. | Phase 6 |
-| GitHub verification. Challenge evidence (repo, commit hash) is entered by you and always shows as **unverified**. | Phase 4 |
+| GitHub account sign-in (OAuth) and repo sync. Not needed: verification and project import work on public repos with no account link, and `GITHUB_TOKEN` covers private ones. | not scheduled |
 | E-mail reminders, scheduler, n8n automation | Phase 5 |
 | Weekly/monthly analytics | Phase 7 |
 | OpenAI and Gemini adapters | not scheduled |
@@ -32,8 +32,8 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 | Videos | Collections with a daily target; paste links or import a YouTube playlist. Finished videos are never suggested again. |
 | AI roadmap | Your AI-engineering path as stages and topics. |
 | Habits | Daily/weekly habits with streaks. |
-| Projects | Projects, milestones, development sessions. |
-| Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. |
+| Projects | Projects, milestones, development sessions. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
+| Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Settings | Shows your account and a light/dark theme switch. Editing your profile or timezone is not built. |
 | AI assistant | Foundation only: provider interface, 16 tools (10 read, 6 propose-only), approval queue, memory. No chat yet. |
 

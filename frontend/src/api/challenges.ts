@@ -79,7 +79,7 @@ export const useCalendar = () => useQuery({ queryKey: [...ROOT, "calendar"], que
 export const useHistory = () => useQuery({ queryKey: [...ROOT, "history"], queryFn: () => api<Challenge[]>("/challenges/history") });
 
 /** Challenges touch projects (new project, development time) and the planner (project minutes), so those are refreshed too. */
-function useChanging<T>(fn: (v: T) => Promise<unknown>) {
+function useChanging<T, R = unknown>(fn: (v: T) => Promise<R>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
@@ -93,3 +93,6 @@ export const useCompleteChallenge = () =>
   useChanging(({ id, ...body }: EvidenceInput & { id: number }) => api<Challenge>(`/challenges/${id}/complete`, { method: "POST", body }));
 export const useDeleteChallenge = () => useChanging((id: number) => api<void>(`/challenges/${id}`, { method: "DELETE" }));
 export const useExcuseDay = () => useChanging((body: { date: string; reason: string }) => api<Challenge>("/challenges/excuse", { method: "POST", body }));
+
+export type VerifyResult = { verified: boolean; checks: { name: string; ok: boolean; detail: string }[]; challenge: Challenge };
+export const useVerifyChallenge = () => useChanging((id: number) => api<VerifyResult>(`/challenges/${id}/verify`, { method: "POST" }));
