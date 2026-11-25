@@ -8,6 +8,8 @@ never passed on. Note for the owner: on the free tier Google may use prompts to 
 
 Known limits: we make up our own call ids (`call_N`) and map results back by name. Gemini 3 models attach a `thoughtSignature` to each function
 call and reject the next turn (400) if it isn't sent back, so it is kept in the tool_use block's `meta` and echoed. Found by testing live."""
+from urllib.parse import quote
+
 import httpx
 
 from app.ai.types import LLMResponse, ProviderError, ToolCall
@@ -94,7 +96,7 @@ class GeminiProvider:
         if tools:
             body["tools"] = [{"functionDeclarations": _declarations(tools)}]
         try:
-            r = self._http.post(f"{API_BASE}/models/{self.model}:generateContent", json=body, headers={"x-goog-api-key": self._key})
+            r = self._http.post(f"{API_BASE}/models/{quote(self.model, safe='')}:generateContent", json=body, headers={"x-goog-api-key": self._key})
         except httpx.HTTPError:
             raise ProviderError("Couldn't reach the Gemini API. Check your connection") from None
         if r.status_code != 200:

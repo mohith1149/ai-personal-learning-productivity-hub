@@ -54,12 +54,27 @@ class AnthropicProvider:
         return LLMResponse(text="".join(text), tool_calls=calls, stop_reason=resp.stop_reason or "end_turn")
 
 
-def get_provider(settings: Settings):
-    """The configured provider, or None when AI is off (the default) or its key is missing."""
-    if settings.ai_provider == "anthropic" and settings.anthropic_api_key:
-        return AnthropicProvider(settings.anthropic_api_key, settings.anthropic_model)
-    if settings.ai_provider == "gemini" and settings.gemini_api_key:
+def get_provider(settings: Settings, provider: str | None = None, model: str | None = None):
+    """The provider to use, or None when AI is off (the default) or the chosen provider has no key.
+
+    `provider`/`model` are the user's pick from the model menu; without them the default from backend/.env is used.
+    An unsafe model name raises ValueError. (A name the provider doesn't know is answered by the provider itself, with a clear message.)"""
+    from app.ai.catalog import configured, valid_model_id
+
+    keys = configured(settings)  # empty while AI_PROVIDER=none: a key alone never turns AI on
+    name = provider or settings.ai_provider
+    if name not in keys:
+        return None
+    key, default = keys[name]
+    if model is not None and not valid_model_id(model):
+        raise ValueError("That model name isn't valid")
+    chosen = model or default
+    if name == "anthropic":
+        return AnthropicProvider(key, chosen)
+    if name == "gemini":
         from app.ai.gemini import GeminiProvider
 
-        return GeminiProvider(settings.gemini_api_key, settings.gemini_model)
-    return None
+        return GeminiProvider(key, chosen)
+    from app.ai.groq import GroqProvider
+
+    return GroqProvider(key, chosen)

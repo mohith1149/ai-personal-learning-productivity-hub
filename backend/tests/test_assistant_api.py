@@ -16,7 +16,7 @@ def c(client):
 
 def use(monkeypatch, *responses):
     p = ScriptedProvider(list(responses))
-    monkeypatch.setattr(router, "current_provider", lambda: p)
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: p)
     return p
 
 
@@ -25,7 +25,7 @@ def propose(name, **input_) -> LLMResponse:
 
 
 @pytest.mark.parametrize("method, path", [
-    ("get", "/api/ai/status"), ("get", "/api/ai/tools"), ("get", "/api/ai/memories"), ("post", "/api/ai/memories"), ("delete", "/api/ai/memories/1"),
+    ("get", "/api/ai/status"), ("get", "/api/ai/tools"), ("get", "/api/ai/models"),
     ("post", "/api/ai/chat"), ("get", "/api/ai/conversations"), ("get", "/api/ai/conversations/1"), ("delete", "/api/ai/conversations/1"),
     ("get", "/api/ai/pending"), ("post", "/api/ai/pending/1/approve"), ("post", "/api/ai/pending/1/reject"),
 ])
@@ -47,7 +47,7 @@ def test_status_with_a_provider_still_says_it_is_not_live_verified(c, monkeypatc
 def test_the_tools_endpoint_lists_what_the_assistant_may_do(c):
     tools = {t["name"]: t for t in c.get("/api/ai/tools").json()}
     assert tools["get_today_tasks"]["kind"] == "read" and tools["create_task"]["kind"] == "write"
-    assert tools["create_task"]["input_schema"]["properties"]["title"] and len(tools) == 16
+    assert tools["create_task"]["input_schema"]["properties"]["title"] and len(tools) == 15
     assert "api_key" not in str(tools).lower()
 
 
@@ -83,7 +83,7 @@ def test_a_provider_failure_is_a_clean_502(c, monkeypatch):
         def complete(self, **kw):
             raise ProviderError("The Anthropic API request failed (RuntimeError)")
 
-    monkeypatch.setattr(router, "current_provider", lambda: Broken())
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: Broken())
     r = c.post("/api/ai/chat", json={"message": "hi"})
     assert r.status_code == 502 and "RuntimeError" in r.json()["detail"]
 
@@ -116,30 +116,18 @@ def test_reject_over_http(c, monkeypatch):
     assert c.post("/api/ai/pending/99999/approve").status_code == 404
 
 
-def test_memory_over_http(c):
-    assert c.get("/api/ai/memories").json() == []
-    r = c.post("/api/ai/memories", json={"content": "Prefers short answers", "kind": "preference"})
-    assert r.status_code == 201 and r.json()["source"] == "user"
-    assert c.post("/api/ai/memories", json={"content": "prefers short answers"}).status_code == 409
-    for body in ({}, {"content": "hi"}, {"content": "Valid text", "kind": "secret"}, {"content": "Valid text", "extra": 1}):
-        assert c.post("/api/ai/memories", json=body).status_code == 422
-    assert [m["content"] for m in c.get("/api/ai/memories").json()] == ["Prefers short answers"]
-    assert c.delete(f"/api/ai/memories/{r.json()['id']}").status_code == 204
-    assert c.delete(f"/api/ai/memories/{r.json()['id']}").status_code == 404
-
-
 def test_other_users_data_is_not_reachable(c, db, monkeypatch):
-    from app.models import AIConversation, AIMemory, AIPendingAction, User
+    from app.models import AIConversation, AIPendingAction, User
 
     db.add(User(id=2, email="o@example.com", password_hash="x", display_name="O", timezone="UTC"))
     db.commit()
     conv = AIConversation(user_id=2, title="theirs")
-    db.add_all([conv, AIMemory(user_id=2, content="their secret")])
+    db.add(conv)
     db.commit()
     db.add(AIPendingAction(conversation_id=conv.id, tool_use_id="x", tool_name="create_task", tool_input='{"title": "Theirs"}'))
     db.commit()
     aid = db.query(AIPendingAction).one().id
-    assert c.get("/api/ai/conversations").json() == [] and c.get("/api/ai/memories").json() == [] and c.get("/api/ai/pending").json() == []
+    assert c.get("/api/ai/conversations").json() == [] and c.get("/api/ai/pending").json() == []
     assert c.get(f"/api/ai/conversations/{conv.id}").status_code == 404
     assert c.post(f"/api/ai/pending/{aid}/approve").status_code == 404
     use(monkeypatch, LLMResponse(text="x"))

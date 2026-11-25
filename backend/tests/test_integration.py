@@ -118,7 +118,7 @@ def test_a_whole_day_through_every_feature_and_all_views_agree(c, monkeypatch):
         LLMResponse(tool_calls=[ToolCall("b", "complete_task", {"task_id": t_late["id"]}), ToolCall("c", "create_task", {"title": "Review notes", "scheduled_date": day(1)})], stop_reason="tool_use"),
         LLMResponse(text="I proposed two changes. They need your approval."),
     ])
-    monkeypatch.setattr(assistant_router, "current_provider", lambda: script)
+    monkeypatch.setattr(assistant_router, "current_provider", lambda *_a, **_k: script)
     out = c.post("/api/ai/chat", json={"message": "clear my backlog"}).json()
     assert [a["tool_name"] for a in out["pending"]] == ["complete_task", "create_task"]
     assert c.get(f"/api/tasks/{t_late['id']}").json()["status"] != "completed"          # proposal only
@@ -141,7 +141,6 @@ def test_a_second_account_row_sees_none_of_it(c, db):
     c.post("/api/tasks", json={"title": "Mine", "scheduled_date": day(0)})
     c.post("/api/habits", json={"name": "Reading", "start_date": day(-1)})
     c.post("/api/projects", json={"title": "Private project"})
-    c.post("/api/ai/memories", json={"content": "I like short answers"})
 
     from app.core.timeutil import user_today
     from app.models import User

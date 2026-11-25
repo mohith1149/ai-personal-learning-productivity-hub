@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
 import { api } from "./client";
 
 export type AiStatus = { provider: string; connected: boolean; model: string | null; live_verified: boolean; message: string };
 export type AiTool = { name: string; description: string; kind: "read" | "write"; input_schema: Record<string, unknown> };
-export type Memory = { id: number; kind: "preference" | "fact" | "goal"; content: string; source: "user" | "assistant"; created_at: string };
 export type Pending = {
   id: number;
   conversation_id: number;
@@ -20,7 +20,6 @@ const ROOT = ["ai"] as const;
 
 export const useAiStatus = () => useQuery({ queryKey: [...ROOT, "status"], queryFn: () => api<AiStatus>("/ai/status") });
 export const useAiTools = () => useQuery({ queryKey: [...ROOT, "tools"], queryFn: () => api<AiTool[]>("/ai/tools") });
-export const useMemories = () => useQuery({ queryKey: [...ROOT, "memories"], queryFn: () => api<Memory[]>("/ai/memories") });
 export const usePending = () => useQuery({ queryKey: [...ROOT, "pending"], queryFn: () => api<Pending[]>("/ai/pending") });
 
 function useChanging<T, R = unknown>(fn: (v: T) => Promise<R>, extra: string[] = []) {
@@ -28,8 +27,6 @@ function useChanging<T, R = unknown>(fn: (v: T) => Promise<R>, extra: string[] =
   return useMutation({ mutationFn: fn, onSuccess: () => Promise.all(["ai", ...extra].map((k) => qc.invalidateQueries({ queryKey: [k] }))) });
 }
 
-export const useAddMemory = () => useChanging((body: { content: string; kind: Memory["kind"] }) => api<Memory>("/ai/memories", { method: "POST", body }));
-export const useDeleteMemory = () => useChanging((id: number) => api<void>(`/ai/memories/${id}`, { method: "DELETE" }));
 /** An approved proposal changes real data (tasks, projects, challenges...), so those pages' cached data is refreshed too. */
 export const useApprove = () => useChanging((id: number) => api<Pending>(`/ai/pending/${id}/approve`, { method: "POST" }), ["tasks", "projects", "challenges", "planner", "dashboard"]);
 export const useReject = () => useChanging((id: number) => api<Pending>(`/ai/pending/${id}/reject`, { method: "POST" }));
@@ -56,11 +53,63 @@ export const useConversation = (id: number | null) =>
 /** A chat turn can propose changes, so the approval queue is refreshed too (everything under "ai" is invalidated). */
 export const useChat = () =>
   useChanging(({ message, conversation_id }: { message: string; conversation_id: number | null }) =>
-    api<ChatReply>("/ai/chat", { method: "POST", body: { message, conversation_id } }),
+    api<ChatReply>("/ai/chat", { method: "POST", body: { message, conversation_id, ...currentChoice() } }),
   );
 
-export const useCheckConnection = () => useMutation({ mutationFn: () => api<CheckResult>("/ai/check", { method: "POST" }) });
+export const useCheckConnection = () => useMutation({ mutationFn: () => api<CheckResult>("/ai/check", { method: "POST", body: currentChoice() }) });
 
 /** Suggests project fields. Saves nothing. */
 export const useAutofill = () =>
-  useMutation({ mutationFn: (body: { repo_url?: string; description?: string }) => api<Autofill>("/ai/project-autofill", { method: "POST", body }) });
+  useMutation({ mutationFn: (body: { repo_url?: string; description?: string }) => api<Autofill>("/ai/project-autofill", { method: "POST", body: { ...body, ...currentChoice() } }) });
+
+// ---------------------------------------------------------------- the model menu
+
+export type ModelProvider = { provider: string; label: string; default_model: string; models: string[] };
+export type ModelOptions = { default_provider: string | null; providers: ModelProvider[] };
+export type ModelChoice = { provider: string; model: string };
+
+export const useModels = () => useQuery({ queryKey: [...ROOT, "models"], queryFn: () => api<ModelOptions>("/ai/models"), staleTime: 5 * 60_000 });
+
+/** The pick is remembered in this browser only. It is sent with each chat, test and autofill request; no pick = the default from backend/.env. */
+const KEY = "hub.ai-model";
+const listeners = new Set<() => void>();
+const read = (): string => {
+  try {
+    return localStorage.getItem(KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+const parse = (raw: string): ModelChoice | null => {
+  try {
+    const v = JSON.parse(raw) as Partial<ModelChoice>;
+    return typeof v?.provider === "string" && typeof v?.model === "string" ? { provider: v.provider, model: v.model } : null;
+  } catch {
+    return null;
+  }
+};
+
+export function currentChoice(): Partial<ModelChoice> {
+  return parse(read()) ?? {};
+}
+
+export function setModelChoice(choice: ModelChoice | null) {
+  try {
+    if (choice) localStorage.setItem(KEY, JSON.stringify(choice));
+    else localStorage.removeItem(KEY);
+  } catch {
+    /* storage blocked: the pick just isn't remembered */
+  }
+  listeners.forEach((l) => l());
+}
+
+export function useModelChoice(): ModelChoice | null {
+  const raw = useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    read,
+  );
+  return parse(raw);
+}

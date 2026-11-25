@@ -18,7 +18,7 @@ from app.schemas import challenges as chs
 from app.schemas import planner as pls
 from app.schemas import projects as pjs
 from app.schemas import tasks as tks
-from app.services import ai_memory, challenges, courses, dashboard, habits, planner, projects, roadmap, tasks
+from app.services import challenges, courses, dashboard, habits, planner, projects, roadmap, tasks
 
 MAX_ITEMS = 40
 
@@ -49,11 +49,6 @@ class RecordProgress(Args):
     project_id: int
     minutes: Annotated[int, Field(ge=1, le=1440)]
     summary: str = Field(min_length=3, max_length=5000, description="What was actually done.")
-
-
-class Remember(Args):
-    content: str = Field(min_length=3, max_length=500)
-    kind: Literal["preference", "fact", "goal"] = "preference"
 
 
 class ChallengePlan(chs.ChallengeCreate):
@@ -168,11 +163,6 @@ def _challenge_plan(db, user, a: ChallengePlan):
     return {"id": c["id"], "date": c["date"], "planned_task": c["planned_task"]}
 
 
-def _remember(db, user, a: Remember):
-    m = ai_memory.add_memory(db, user, a.content, a.kind, source="assistant")
-    return {"id": m.id}
-
-
 def _task_line(a: tks.TaskCreate) -> str:
     return f'Create the task "{a.title}"' + (f" for {a.scheduled_date}" if a.scheduled_date else "") + (f", due {a.due_date}" if a.due_date else "")
 
@@ -196,7 +186,6 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
          lambda a: f"Log {a.minutes} minutes on project #{a.project_id}: {a.summary[:120]}"),
     Tool("create_project_challenge", "Propose today's (or a future day's) daily project challenge. The user must approve it.", "write", ChallengePlan, _challenge_plan,
          lambda a: f'Plan the challenge "{a.planned_task}" for {a.date or "today"}'),
-    Tool("remember", "Propose saving a short fact or preference about the user. The user must approve it.", "write", Remember, _remember, lambda a: f"Remember: {a.content}"),
 ]}
 
 

@@ -54,11 +54,14 @@ class Settings(BaseSettings):
 
     # Anthropic
     youtube_api_key: str | None = None  # YouTube Data API v3 key; backend only, never sent to the browser
-    ai_provider: str = "none"  # "none" (default, AI off), "anthropic" or "gemini"; a key alone never turns AI on
+    ai_provider: str = "none"  # "none" (default, AI off), "groq", "gemini" or "anthropic". The DEFAULT provider; a key alone never turns AI on.
+    # Every provider that has a key can be picked in the chat's model menu.
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5-5"
     gemini_api_key: str | None = None  # free key from Google AI Studio; backend only
     gemini_model: str = "gemini-3.5-flash"
+    groq_api_key: str | None = None  # free key from console.groq.com; backend only
+    groq_model: str = "llama-3.3-70b-versatile"
 
 
 @lru_cache

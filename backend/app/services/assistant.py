@@ -19,7 +19,6 @@ from app.ai import prompt, tools
 from app.ai.types import LLMProvider, ProviderError
 from app.core.timeutil import user_today
 from app.models import AIConversation, AIMessage, AIPendingAction, User
-from app.services import ai_memory
 from app.services import challenges, courses, dashboard, habits, planner, projects, roadmap, tasks  # noqa: F401  (their exceptions are caught below)
 
 MAX_STEPS = 6
@@ -46,9 +45,9 @@ class NotConnected(Exception):
 
 
 # Business-rule errors raised by the services a tool calls. They are safe, human-readable messages.
-_SERVICE_ERRORS = tuple({m.NotFound for m in (tasks, courses, projects, roadmap, habits, planner, challenges, ai_memory) if hasattr(m, "NotFound")}
-                        | {m.RuleError for m in (tasks, courses, projects, roadmap, habits, planner, challenges, ai_memory) if hasattr(m, "RuleError")}
-                        | {m.Conflict for m in (tasks, courses, projects, roadmap, habits, planner, challenges, ai_memory) if hasattr(m, "Conflict")}
+_SERVICE_ERRORS = tuple({m.NotFound for m in (tasks, courses, projects, roadmap, habits, planner, challenges) if hasattr(m, "NotFound")}
+                        | {m.RuleError for m in (tasks, courses, projects, roadmap, habits, planner, challenges) if hasattr(m, "RuleError")}
+                        | {m.Conflict for m in (tasks, courses, projects, roadmap, habits, planner, challenges) if hasattr(m, "Conflict")}
                         | {ValueError})
 
 
@@ -141,8 +140,7 @@ def chat(db: Session, user: User, provider: LLMProvider | None, message: str, co
     _save(db, conv.id, "user", [{"type": "text", "text": message}])
     db.commit()
 
-    memories = [m.content for m in ai_memory.list_memories(db, user)][:30]
-    system = prompt.system_prompt(user.display_name, user_today(user, now), memories)
+    system = prompt.system_prompt(user.display_name, user_today(user, now))
     specs = tools.specs()
     created: list[AIPendingAction] = []
     reply = ""

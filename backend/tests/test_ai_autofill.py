@@ -40,7 +40,7 @@ def fake_github(readme="# RAG Bot\n\nAnswers questions about docs.", repo_status
 
 def use(monkeypatch, *responses):
     p = ScriptedProvider(list(responses))
-    monkeypatch.setattr(router, "current_provider", lambda: p)
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: p)
     return p
 
 
@@ -56,7 +56,7 @@ def test_check_requires_login(client):
 
 
 def test_check_without_a_provider_is_503(c, monkeypatch):
-    monkeypatch.setattr(router, "current_provider", lambda: None)
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: None)
     assert c.post("/api/ai/check").status_code == 503
 
 
@@ -72,7 +72,7 @@ def test_check_reports_a_failing_provider_without_leaking(c, monkeypatch):
 
         def complete(self, **kw):
             raise ProviderError("The Anthropic API request failed (AuthenticationError)")
-    monkeypatch.setattr(router, "current_provider", lambda: Bad())
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: Bad())
     r = c.post("/api/ai/check")
     assert r.status_code == 502 and "AuthenticationError" in r.json()["detail"]
 
@@ -116,7 +116,7 @@ def test_autofill_needs_a_source(c, monkeypatch):
 
 
 def test_autofill_without_a_provider_is_503(c, monkeypatch):
-    monkeypatch.setattr(router, "current_provider", lambda: None)
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: None)
     assert c.post("/api/ai/project-autofill", json={"description": "x"}).status_code == 503
 
 
@@ -166,5 +166,5 @@ def test_provider_failure_is_502(c, monkeypatch):
 
         def complete(self, **kw):
             raise ProviderError("The Anthropic API request failed (RateLimitError)")
-    monkeypatch.setattr(router, "current_provider", lambda: Bad())
+    monkeypatch.setattr(router, "current_provider", lambda *_a, **_k: Bad())
     assert c.post("/api/ai/project-autofill", json={"repo_url": REPO}).status_code == 502

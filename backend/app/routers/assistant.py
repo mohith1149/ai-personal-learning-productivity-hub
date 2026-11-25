@@ -1,30 +1,30 @@
-"""HTTP endpoints for the AI foundation: status, tools, memory, chat, and approvals. Login required.
+"""HTTP endpoints for the AI assistant: status, models, tools, chat, and approvals. Login required.
 
 Chat answers 503 until a provider is configured (AI_PROVIDER + key in backend/.env). Everything else works without one."""
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.ai import tools
+from app.ai import catalog, tools
 from app.ai.providers import get_provider
 from app.ai.types import ProviderError
 from app.config import get_settings
 from app.core.deps import CurrentUser, DbSession
 from app.routers.challenges import _GH_STATUS, get_github
 from app.schemas import assistant as s
-from app.services import ai_memory, assistant as svc
+from app.services import assistant as svc
 from app.services import github as gh
 from app.services import project_autofill as autofill
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-ERRORS = (svc.NotFound, svc.RuleError, svc.Conflict, ai_memory.NotFound, ai_memory.RuleError, ai_memory.Conflict)
+ERRORS = (svc.NotFound, svc.RuleError, svc.Conflict)
 
 
 def _http(exc: Exception) -> HTTPException:
-    if isinstance(exc, (svc.NotFound, ai_memory.NotFound)):
+    if isinstance(exc, svc.NotFound):
         return HTTPException(status.HTTP_404_NOT_FOUND, str(exc))
-    if isinstance(exc, (svc.Conflict, ai_memory.Conflict)):
+    if isinstance(exc, svc.Conflict):
         return HTTPException(status.HTTP_409_CONFLICT, str(exc))
     return HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc))
 
@@ -36,9 +36,17 @@ def _run(fn, *args):
         raise _http(e) from None
 
 
-def current_provider():
-    """The configured provider or None. A function (not a constant) so tests can swap in a scripted one."""
-    return get_provider(get_settings())
+def current_provider(provider: str | None = None, model: str | None = None):
+    """The provider (the user's menu pick, else the default from .env) or None. A function so tests can swap in a scripted one."""
+    try:
+        return get_provider(get_settings(), provider, model)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from None
+
+
+def get_model_options() -> list[dict]:
+    """A function so tests can avoid the network."""
+    return catalog.options(get_settings())
 
 
 @router.get("/status", response_model=s.StatusOut)
@@ -48,15 +56,24 @@ def get_status(user: CurrentUser):
     if p is not None:
         return {"provider": p.name, "connected": True, "model": p.model, "live_verified": False,
                 "message": "A provider is configured, but the live connection has not been tested yet."}
-    msg = "AI is off. Set AI_PROVIDER=anthropic and ANTHROPIC_API_KEY in backend/.env to turn it on." if cfg.ai_provider == "none" else \
+    msg = "AI is off. Set AI_PROVIDER=groq and GROQ_API_KEY in backend/.env to turn it on (Groq has a free tier)." if cfg.ai_provider == "none" else \
         "A provider is selected but its API key is missing in backend/.env."
     return {"provider": cfg.ai_provider, "connected": False, "model": None, "live_verified": False, "message": msg}
 
 
+@router.get("/models", response_model=s.ModelsOut)
+def models(user: CurrentUser):
+    """The providers that have a key and the models each offers, for the chat's model menu."""
+    cfg = get_settings()
+    options = get_model_options()
+    return {"default_provider": cfg.ai_provider if options else None, "providers": options}
+
+
 @router.post("/check", response_model=s.CheckOut)
-def check_connection(user: CurrentUser):
+def check_connection(user: CurrentUser, body: s.ModelChoice | None = None):
     """A real, tiny request to the provider so you can see whether the key works. Costs a few tokens; stores nothing."""
-    p = current_provider()
+    body = body or s.ModelChoice()
+    p = current_provider(body.provider, body.model)
     if p is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No AI provider is connected. Set AI_PROVIDER and a key in backend/.env")
     try:
@@ -69,7 +86,7 @@ def check_connection(user: CurrentUser):
 @router.post("/project-autofill", response_model=s.AutofillOut)
 def project_autofill(body: s.AutofillIn, user: CurrentUser, client: Annotated[gh.GitHubClient, Depends(get_github)]):
     """Suggest project fields from a GitHub repo and/or a description. Read-only: nothing is saved."""
-    p = current_provider()
+    p = current_provider(body.provider, body.model)
     if p is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "No AI provider is connected. Set AI_PROVIDER and a key in backend/.env")
     try:
@@ -88,30 +105,12 @@ def list_tools(user: CurrentUser):
     return [{**t.spec(), "kind": t.kind} for t in tools.TOOLS.values()]
 
 
-# ------------------------------ memory ------------------------------
-
-@router.get("/memories", response_model=list[s.MemoryOut])
-def list_memories(user: CurrentUser, db: DbSession):
-    return ai_memory.list_memories(db, user)
-
-
-@router.post("/memories", response_model=s.MemoryOut, status_code=status.HTTP_201_CREATED)
-def add_memory(body: s.MemoryIn, user: CurrentUser, db: DbSession):
-    return _run(ai_memory.add_memory, db, user, body.content, body.kind, "user")
-
-
-@router.delete("/memories/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_memory(memory_id: int, user: CurrentUser, db: DbSession) -> Response:
-    _run(ai_memory.delete_memory, db, user, memory_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 # ------------------------------ chat ------------------------------
 
 @router.post("/chat", response_model=s.ChatOut)
 def chat(body: s.ChatIn, user: CurrentUser, db: DbSession):
     try:
-        return svc.chat(db, user, current_provider(), body.message, body.conversation_id)
+        return svc.chat(db, user, current_provider(body.provider, body.model), body.message, body.conversation_id)
     except svc.NotConnected as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e)) from None
     except ProviderError as e:

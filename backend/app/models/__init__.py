@@ -1,7 +1,6 @@
 """Import every model so Base.metadata is complete (Alembic autogenerate relies on this)."""
 from app.models.daily import (  # noqa: F401
     AIConversation,
-    AIMemory,
     AIMessage,
     AIPendingAction,
     DailyCheckin,
