@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4, 5, 6 and 7 complete. Phase 8 (docs) remains.
+Last updated: 2026-11-25 — Phases 4 to 8 complete. All planned phases are done.
 ---
 
 ## 1. Purpose
@@ -110,7 +110,8 @@ cd ai-learning-hub\frontend; npm run typecheck; npm test      # Vitest + Testing
 ```
 ai-learning-hub/
   PROJECT_CONTEXT.md        ← this file
-  README.md                 ← setup & run (Phase 8 expands)
+  README.md                 ← overview, status, quick start; links to docs/
+  docs/                     SETUP, INTEGRATIONS, DEPLOYMENT, TROUBLESHOOTING, n8n-run-due.json
   backend/
     app/
       main.py               FastAPI app factory, CORS, router registration, scheduler start
