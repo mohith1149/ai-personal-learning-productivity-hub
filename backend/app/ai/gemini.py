@@ -6,8 +6,8 @@ Verified here only against a fake HTTP transport (request and response translati
 Security: the key goes in the `x-goog-api-key` HEADER, never the URL (httpx logs URLs). Error messages are written here; raw Google error text is
 never passed on. Note for the owner: on the free tier Google may use prompts to improve its products, so don't put private data into the assistant.
 
-Known limits: Gemini function calls carry no id, so we make one up (`call_N`) and map results back by name. Thinking is switched off
-(`thinkingBudget: 0`) so replies don't need "thought signatures" to be sent back on multi-step tool use."""
+Known limits: we make up our own call ids (`call_N`) and map results back by name. Gemini 3 models attach a `thoughtSignature` to each function
+call and reject the next turn (400) if it isn't sent back, so it is kept in the tool_use block's `meta` and echoed. Found by testing live."""
 import httpx
 
 from app.ai.types import LLMResponse, ProviderError, ToolCall
@@ -64,7 +64,10 @@ def _contents(messages: list[dict]) -> list[dict]:
                 parts.append({"text": b["text"]})
             elif b["type"] == "tool_use":
                 names[b["id"]] = b["name"]
-                parts.append({"functionCall": {"name": b["name"], "args": b["input"]}})
+                part = {"functionCall": {"name": b["name"], "args": b["input"]}}
+                if (b.get("meta") or {}).get("thoughtSignature"):  # Gemini 3 requires this to be sent back, or the next turn is a 400
+                    part["thoughtSignature"] = b["meta"]["thoughtSignature"]
+                parts.append(part)
             elif b["type"] == "tool_result":
                 key = "error" if b.get("is_error") else "result"
                 parts.append({"functionResponse": {"name": names.get(b["tool_use_id"], "tool"), "response": {key: b["content"]}}})
@@ -110,7 +113,8 @@ class GeminiProvider:
                 text.append(p["text"])
             elif "functionCall" in p:
                 fc = p["functionCall"]
-                calls.append(ToolCall(id=f"call_{len(calls) + 1}", name=fc["name"], input=dict(fc.get("args") or {})))
+                calls.append(ToolCall(id=f"call_{len(calls) + 1}", name=fc["name"], input=dict(fc.get("args") or {}),
+                                      meta={"thoughtSignature": p["thoughtSignature"]} if p.get("thoughtSignature") else None))
         reason = cand.get("finishReason", "STOP")
         return LLMResponse(text="".join(text), tool_calls=calls, stop_reason="tool_use" if calls else ("max_tokens" if reason == "MAX_TOKENS" else "end_turn"))
 

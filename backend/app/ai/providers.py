@@ -39,6 +39,8 @@ class AnthropicProvider:
         self._client = client
 
     def complete(self, *, system: str, messages: list[dict], tools: list[dict]) -> LLMResponse:
+        # Drop other providers' echo-back data (`meta`): Anthropic rejects unknown fields in a block.
+        messages = [{**m, "content": [{k: v for k, v in b.items() if k != "meta"} for b in m["content"]]} for m in messages]
         try:
             resp = self._client.messages.create(model=self.model, max_tokens=self.max_tokens, system=system, messages=messages, tools=tools)
         except Exception as exc:  # the SDK's errors can include request details; show only the class of problem

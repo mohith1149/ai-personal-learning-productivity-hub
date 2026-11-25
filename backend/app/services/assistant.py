@@ -152,7 +152,7 @@ def chat(db: Session, user: User, provider: LLMProvider | None, message: str, co
         except ProviderError:
             db.rollback()
             raise
-        blocks = ([{"type": "text", "text": resp.text}] if resp.text else []) + [{"type": "tool_use", "id": c.id, "name": c.name, "input": c.input} for c in resp.tool_calls]
+        blocks = ([{"type": "text", "text": resp.text}] if resp.text else []) + [{"type": "tool_use", "id": c.id, "name": c.name, "input": c.input, **({"meta": c.meta} if c.meta else {})} for c in resp.tool_calls]
         if not blocks:
             blocks = [{"type": "text", "text": "(no reply)"}]
         _save(db, conv.id, "assistant", blocks)
