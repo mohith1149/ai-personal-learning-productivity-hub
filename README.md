@@ -4,12 +4,13 @@ A single-user, self-hosted command center that tells you every day what to learn
 It is also a hands-on AI-engineering project: the backend is built around a provider-neutral LLM interface with tool calling and
 approval gates.
 
-> Detailed design notes, decisions and the per-milestone history live in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
+> Guides: [Setup](docs/SETUP.md) · [Integrations](docs/INTEGRATIONS.md) (e-mail, GitHub, YouTube, AI, n8n) · [Deployment and backups](docs/DEPLOYMENT.md) · [Troubleshooting](docs/TROUBLESHOOTING.md).
+> Design notes, decisions and the per-milestone history live in [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
 
 ## Status (read this first)
 
 **Works today (tested):** sign-in, tasks, courses, video collections with YouTube import, an AI-engineering roadmap, habits, projects,
-a combined daily planner, a daily AI project challenge, a dashboard, and the AI assistant's foundation.
+a combined daily planner, a daily AI project challenge, a dashboard, weekly and monthly reports, e-mail reminders and the AI assistant.
 
 **Not working yet:**
 
@@ -38,6 +39,8 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 
 ## Run it (Windows, development)
 
+Full steps, including updating and where files live: [docs/SETUP.md](docs/SETUP.md).
+
 Requirements: Python 3.11, Node 20.
 
 ```powershell
@@ -58,6 +61,8 @@ cd frontend; npm run dev        # http://localhost:5173, proxies /api to :8000
 Open http://localhost:5173 and create the one account on first visit.
 
 ## E-mail reminders (optional)
+
+More detail (Gmail App Password steps, retries, n8n): [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Off until you configure it. In `backend/.env`:
 
@@ -105,8 +110,8 @@ ANTHROPIC_API_KEY=<your key from console.anthropic.com>
 The model menu asks Groq and Gemini for their current model list (model names get retired), and falls back to a short built-in list.
 
 Restart the backend, open **AI assistant**, press **Test the connection** (a tiny real request). Only then does the chat window appear.
-Nothing the assistant proposes happens until you approve it. Keys never leave the backend. Both adapters are tested only against
-fake servers until you run them with a real key (Gemini has been run live; Groq has not).
+Nothing the assistant proposes happens until you approve it. Keys never leave the backend. The adapters are tested against
+fake servers until you run them with a real key (Groq and Gemini have been run live; Anthropic has not).
 
 ## Tests
 
@@ -126,6 +131,11 @@ Run `npm test` from a path with an uppercase drive letter (`D:\...`); from Git B
 - **AI:** `backend/app/ai/` holds the provider interface and the tool registry. The model never touches the database. It can only call
   tools, which call the same services as the web pages. Read tools run immediately. Write tools only create a proposal that you approve
   on the AI assistant page. There is deliberately no tool that completes a challenge or deletes anything.
+
+## Deploying and backups
+
+The backend serves only `/api`; put a reverse proxy in front that serves `frontend/dist` and forwards `/api`, run one worker, set
+`ENVIRONMENT=production` and `COOKIE_SECURE=true`, and back up with SQLite's backup command. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Security notes
 
