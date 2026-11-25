@@ -85,7 +85,7 @@ Off until you add a key. Pick one provider in `backend/.env`.
 ```
 AI_PROVIDER=gemini
 GEMINI_API_KEY=<key from https://aistudio.google.com/apikey>
-GEMINI_MODEL=gemini-2.5-flash      # change it if Google has retired this name
+GEMINI_MODEL=gemini-3.5-flash      # change it if Google has retired this name
 ```
 
 **Paid, pay-as-you-go: Anthropic**:
