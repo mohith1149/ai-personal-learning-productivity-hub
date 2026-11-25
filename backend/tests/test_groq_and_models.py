@@ -122,7 +122,7 @@ def test_groq_is_selected_only_with_the_setting_and_a_key():
     assert get_provider(settings(ai_provider="groq", groq_api_key=KEY)).name == "groq"
     assert get_provider(settings(ai_provider="groq")) is None                      # key missing
     assert get_provider(settings(ai_provider="none", groq_api_key=KEY)) is None    # a key alone never turns AI on
-    assert get_provider(settings(ai_provider="groq", groq_api_key=KEY)).model == "llama-3.3-70b-versatile"
+    assert get_provider(settings(ai_provider="groq", groq_api_key=KEY)).model == "openai/gpt-oss-120b"
 
 
 def test_the_menu_pick_overrides_provider_and_model_but_only_for_providers_with_a_key():
@@ -159,16 +159,16 @@ def fake_http(groq_ids=None, fail=False):
 
 def test_live_model_lists_are_filtered_to_chat_models():
     s = settings(ai_provider="groq", groq_api_key=KEY, gemini_api_key="g")
-    out = catalog.options(s, fake_http(["whisper-large-v3", "llama-3.3-70b-versatile", "playai-tts", "openai/gpt-oss-20b", "meta-llama/llama-guard-4-12b"]))
+    out = catalog.options(s, fake_http(["whisper-large-v3", "openai/gpt-oss-120b", "playai-tts", "openai/gpt-oss-20b", "meta-llama/llama-guard-4-12b"]))
     assert [o["provider"] for o in out] == ["groq", "gemini"]                      # the default provider comes first
-    assert out[0]["models"] == ["llama-3.3-70b-versatile", "openai/gpt-oss-20b"] and out[1]["models"] == ["gemini-3.5-flash", "gemini-a"]  # default always included
+    assert out[0]["models"] == ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] and out[1]["models"] == ["gemini-3.5-flash", "gemini-a"]  # default always included
 
 
 def test_when_the_list_cannot_be_fetched_the_curated_list_is_used_and_not_cached():
     s = settings(ai_provider="groq", groq_api_key=KEY)
     out = catalog.options(s, fake_http(fail=True))
     assert out[0]["models"] == catalog.CURATED["groq"] and "groq" not in catalog._cache
-    assert catalog.options(s, fake_http(["only-model"]))[0]["models"] == ["llama-3.3-70b-versatile", "only-model"]
+    assert catalog.options(s, fake_http(["only-model"]))[0]["models"] == ["openai/gpt-oss-120b", "only-model"]
 
 
 def test_nothing_is_offered_while_ai_is_off_and_only_providers_with_keys_are_listed():

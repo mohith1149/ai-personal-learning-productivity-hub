@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None  # free key from Google AI Studio; backend only
     gemini_model: str = "gemini-3.5-flash"
     groq_api_key: str | None = None  # free key from console.groq.com; backend only
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
 
 @lru_cache

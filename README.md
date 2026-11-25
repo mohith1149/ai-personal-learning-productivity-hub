@@ -86,7 +86,7 @@ you can switch between them (and between each provider's models) without touchin
 ```
 AI_PROVIDER=groq
 GROQ_API_KEY=<key from https://console.groq.com/keys>
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 **Free but tightly limited: Google Gemini** (about 5 requests a minute, which a tool-using chat can hit; Google may use free-tier prompts):
