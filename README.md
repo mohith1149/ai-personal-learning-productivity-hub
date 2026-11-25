@@ -17,8 +17,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 |---|---|
 | Live AI assistant and chat window. The Anthropic adapter exists but has only been tested against a stub, never against the real API. The `/assistant` page shows this honestly. | Phase 6 |
 | GitHub account sign-in (OAuth) and repo sync. Not needed: verification and project import work on public repos with no account link, and `GITHUB_TOKEN` covers private ones. | not scheduled |
-| Sending real e-mail has not been tried with a live mail account (tests use a fake mail server). Gmail API (OAuth) is not built; SMTP with an App Password is. | needs your credentials |
-| The n8n workflow in `docs/n8n-run-due.json` is untested in n8n | optional |
+| Gmail API (OAuth) sending. SMTP with an App Password is built and was tested with a real Gmail account and n8n. | not scheduled |
 | Weekly/monthly analytics | Phase 7 |
 | OpenAI and Gemini adapters | not scheduled |
 
@@ -75,7 +74,7 @@ EMAIL_FROM=you@gmail.com
 Restart the backend, open Settings, switch reminders on, press **Send a test e-mail**. The page shows the real result: *Sent* only
 after the mail server accepted it, otherwise *Failed* with the reason. The built-in scheduler (`SCHEDULER_MODE=internal`, default)
 checks every minute; each e-mail goes out once per day (weekly report: once per week), and an empty plan sends nothing.
-To use n8n instead, set `SCHEDULER_MODE=n8n`, set `AUTOMATION_API_KEY`, and import `docs/n8n-run-due.json` (never run both).
+To use n8n instead, set `SCHEDULER_MODE=n8n`, set `AUTOMATION_API_KEY`, and import `docs/n8n-run-due.json` (never run both). In n8n use `127.0.0.1`, not `localhost` (n8n resolves `localhost` to IPv6 and the backend listens on IPv4).
 
 ## Tests
 

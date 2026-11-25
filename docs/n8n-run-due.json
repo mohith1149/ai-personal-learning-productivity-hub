@@ -11,7 +11,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:8000/api/automation/run-due",
+        "url": "http://127.0.0.1:8000/api/automation/run-due",
         "sendHeaders": true,
         "headerParameters": { "parameters": [{ "name": "X-Automation-Key", "value": "PASTE_YOUR_AUTOMATION_API_KEY" }] }
       },
