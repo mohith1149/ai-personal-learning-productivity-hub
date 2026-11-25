@@ -78,15 +78,26 @@ To use n8n instead, set `SCHEDULER_MODE=n8n`, set `AUTOMATION_API_KEY`, and impo
 
 ## AI assistant (optional)
 
-Off until you add a key. In `backend/.env`:
+Off until you add a key. Pick one provider in `backend/.env`.
+
+**Free: Google Gemini** (free tier, rate limited; Google may use free-tier prompts to improve its products, so keep private data out):
+
+```
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<key from https://aistudio.google.com/apikey>
+GEMINI_MODEL=gemini-2.5-flash      # change it if Google has retired this name
+```
+
+**Paid, pay-as-you-go: Anthropic**:
 
 ```
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=<your key from console.anthropic.com>
 ```
 
-Restart the backend, open **AI assistant**, press **Test the connection** (a tiny real request, costs a few tokens). Only then does the
-chat window appear. Nothing the assistant proposes happens until you approve it. The key never leaves the backend.
+Restart the backend, open **AI assistant**, press **Test the connection** (a tiny real request). Only then does the chat window appear.
+Nothing the assistant proposes happens until you approve it. Keys never leave the backend. Both adapters are tested only against
+fake servers until you run them with a real key.
 
 ## Tests
 

@@ -54,9 +54,11 @@ class Settings(BaseSettings):
 
     # Anthropic
     youtube_api_key: str | None = None  # YouTube Data API v3 key; backend only, never sent to the browser
-    ai_provider: str = "none"  # "none" (default, AI off) or "anthropic"; the key alone never turns AI on
+    ai_provider: str = "none"  # "none" (default, AI off), "anthropic" or "gemini"; a key alone never turns AI on
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-opus-5-5"
+    gemini_api_key: str | None = None  # free key from Google AI Studio; backend only
+    gemini_model: str = "gemini-2.5-flash"
 
 
 @lru_cache
