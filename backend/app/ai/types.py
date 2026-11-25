@@ -14,6 +14,7 @@ class ToolCall:
     id: str
     name: str
     input: dict
+    meta: dict | None = None   # provider-specific data that must be echoed back (Gemini's thoughtSignature); stored in the tool_use block
 
 
 @dataclass

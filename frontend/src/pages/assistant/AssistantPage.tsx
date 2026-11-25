@@ -1,25 +1,13 @@
-import { Check, Trash2, X } from "lucide-react";
-import { useState } from "react";
-import {
-  useAddMemory,
-  useAiStatus,
-  useAiTools,
-  useCheckConnection,
-  useApprove,
-  useDeleteMemory,
-  useMemories,
-  usePending,
-  useReject,
-  type Memory,
-  type Pending,
-} from "../../api/assistant";
-import { FormError, SelectInput, TextInput } from "../../components/forms";
+import { Check, X } from "lucide-react";
+import { useAiStatus, useAiTools, useApprove, useCheckConnection, useModelChoice, usePending, useReject, type Pending } from "../../api/assistant";
+import { FormError } from "../../components/forms";
 import { Badge, Button, Card, ErrorNotice, PageHeader, Spinner } from "../../components/ui";
 import { ChatCard } from "./ChatCard";
 
 function StatusCard() {
   const status = useAiStatus();
   const check = useCheckConnection();
+  const choice = useModelChoice();
   return (
     <Card aria-label="Assistant status">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Connection</h2>
@@ -31,7 +19,7 @@ function StatusCard() {
         <>
           <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <Badge tone={status.data.connected ? "brand" : "neutral"}>{status.data.connected ? "Provider configured" : "Not connected"}</Badge>
-            {status.data.model && <span>Model: {status.data.model}</span>}
+            {status.data.model && <span>Model: {choice?.model ?? status.data.model}</span>}
             {!status.data.live_verified && <Badge>Not tested live</Badge>}
           </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{status.data.message}</p>
@@ -104,70 +92,6 @@ function ApprovalsCard() {
   );
 }
 
-function MemoryRow({ m }: { m: Memory }) {
-  const del = useDeleteMemory();
-  return (
-    <li className="flex items-center gap-3 py-2">
-      <Badge>{m.kind}</Badge>
-      <span className="min-w-0 flex-1 text-sm text-slate-900 dark:text-slate-100">{m.content}</span>
-      <span className="text-xs text-slate-500 dark:text-slate-400">{m.source === "assistant" ? "added by assistant" : "added by you"}</span>
-      <Button variant="ghost" icon={Trash2} loading={del.isPending} onClick={() => del.mutate(m.id)} aria-label={`Delete memory: ${m.content}`} className="px-2 py-1" />
-    </li>
-  );
-}
-
-function MemoryCard() {
-  const memories = useMemories();
-  const add = useAddMemory();
-  const [content, setContent] = useState("");
-  const [kind, setKind] = useState<Memory["kind"]>("preference");
-  const [localError, setLocalError] = useState<string | null>(null);
-  return (
-    <Card aria-label="Memory">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Memory</h2>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Short notes the assistant will see. You can read and delete every one. It can only add a note if you approve it.</p>
-      <form
-        className="mt-3 flex flex-wrap items-end gap-3"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          setLocalError(null);
-          if (content.trim().length < 3) return setLocalError("A memory needs at least 3 characters.");
-          add.mutate({ content: content.trim(), kind }, { onSuccess: () => setContent("") });
-        }}
-      >
-        <div className="min-w-[14rem] flex-1">
-          <TextInput label="Add a note" value={content} onChange={(e) => setContent(e.target.value)} maxLength={500} />
-        </div>
-        <SelectInput label="Type" value={kind} onChange={(e) => setKind(e.target.value as Memory["kind"])}>
-          <option value="preference">Preference</option>
-          <option value="fact">Fact</option>
-          <option value="goal">Goal</option>
-        </SelectInput>
-        <Button type="submit" loading={add.isPending}>
-          Save note
-        </Button>
-      </form>
-      <div className="mt-2">
-        <FormError message={localError ?? add.error?.message} />
-      </div>
-      {memories.isPending ? (
-        <Spinner label="Loading…" />
-      ) : memories.isError ? (
-        <ErrorNotice error={memories.error} onRetry={() => memories.refetch()} />
-      ) : memories.data.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Nothing saved yet.</p>
-      ) : (
-        <ul aria-label="Saved notes" className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
-          {memories.data.map((m) => (
-            <MemoryRow key={m.id} m={m} />
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
 function ToolsCard() {
   const tools = useAiTools();
   return (
@@ -200,20 +124,16 @@ function ToolsCard() {
   );
 }
 
-function ChatGate() {
-  const status = useAiStatus();
-  return status.data?.connected ? <ChatCard /> : null;
-}
-
 export function AssistantPage() {
+  const connected = useAiStatus().data?.connected === true;
   return (
     <>
-      <PageHeader title="AI assistant" description="Chat with the assistant, review what it proposes, and manage its memory." />
+      <PageHeader title="AI assistant" description="Chat with the assistant and review what it proposes." />
       <div className="space-y-4">
+        {connected && <ChatCard />}
+        {connected && <ApprovalsCard />}
         <StatusCard />
-        <ChatGate />
-        <ApprovalsCard />
-        <MemoryCard />
+        {!connected && <ApprovalsCard />}
         <ToolsCard />
       </div>
     </>

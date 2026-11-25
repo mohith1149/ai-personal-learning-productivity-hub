@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.schemas.common import Strict
 
@@ -22,21 +22,25 @@ class ToolOut(BaseModel):
     input_schema: dict[str, Any]
 
 
-class MemoryIn(Strict):
-    content: str = Field(min_length=3, max_length=500)
-    kind: Literal["preference", "fact", "goal"] = "preference"
+class ModelChoice(Strict):
+    """The model picked in the chat's menu. Both empty = the default from backend/.env."""
+    provider: Literal["groq", "gemini", "anthropic"] | None = None
+    model: str | None = Field(default=None, max_length=100)
 
 
-class MemoryOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    kind: str
-    content: str
-    source: str
-    created_at: datetime
+class ModelProviderOut(BaseModel):
+    provider: str
+    label: str
+    default_model: str
+    models: list[str]
 
 
-class ChatIn(Strict):
+class ModelsOut(BaseModel):
+    default_provider: str | None  # None while AI is off
+    providers: list[ModelProviderOut]
+
+
+class ChatIn(ModelChoice):
     message: str = Field(min_length=1, max_length=4000)
     conversation_id: int | None = None
 
@@ -81,7 +85,7 @@ class ConversationOut(BaseModel):
     pending: list[PendingOut]
 
 
-class AutofillIn(Strict):
+class AutofillIn(ModelChoice):
     repo_url: str | None = Field(default=None, max_length=500)
     description: str | None = Field(default=None, max_length=4000)
 

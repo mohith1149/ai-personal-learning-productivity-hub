@@ -45,6 +45,35 @@ def test_function_call_becomes_a_tool_call_with_a_generated_id():
     assert [(c.id, c.name, c.input) for c in r.tool_calls] == [("call_1", "get_plan", {"day": "2026-12-02"}), ("call_2", "get_today_tasks", {})]
 
 
+def test_thought_signature_is_kept_and_echoed_back():
+    """Gemini 3 answers 400 on the next turn if a function call's thoughtSignature is not sent back (found live)."""
+    body = {"candidates": [{"content": {"parts": [{"functionCall": {"name": "get_plan", "args": {}, "id": "x"}, "thoughtSignature": "SIG=="}]}, "finishReason": "STOP"}]}
+    call = provider(body=body).complete(system="s", messages=[USER_MSG], tools=[]).tool_calls[0]
+    assert call.meta == {"thoughtSignature": "SIG=="}
+    seen: list = []
+    msgs = [USER_MSG, {"role": "assistant", "content": [{"type": "tool_use", "id": call.id, "name": "get_plan", "input": {}, "meta": call.meta}]}]
+    provider(seen=seen).complete(system="s", messages=msgs, tools=[])
+    assert json.loads(seen[0].content)["contents"][1]["parts"][0]["thoughtSignature"] == "SIG=="
+
+
+def test_anthropic_never_receives_gemini_meta():
+    from app.ai.providers import AnthropicProvider
+
+    sent: list = []
+
+    class Client:
+        class messages:
+            @staticmethod
+            def create(**kw):
+                sent.append(kw["messages"])
+                raise RuntimeError("stop")
+
+    msgs = [{"role": "assistant", "content": [{"type": "tool_use", "id": "a", "name": "n", "input": {}, "meta": {"thoughtSignature": "S"}}]}]
+    with pytest.raises(ProviderError):
+        AnthropicProvider("k", "m", client=Client).complete(system="s", messages=msgs, tools=[])
+    assert "meta" not in sent[0][0]["content"][0]
+
+
 def test_tool_history_is_translated_both_ways():
     seen: list = []
     msgs = [USER_MSG,

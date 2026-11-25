@@ -1,8 +1,9 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { installFakeApi } from "./fakeApi";
-import { installFakeAssistant, mkMemory, mkPending, type FakeAssistant } from "./fakeAssistant";
+import { setModelChoice } from "../api/assistant";
+import { installFakeAssistant, mkPending, type FakeAssistant } from "./fakeAssistant";
 import { renderAt } from "./render";
 
 async function open(seed: Partial<FakeAssistant> = {}) {
@@ -12,6 +13,10 @@ async function open(seed: Partial<FakeAssistant> = {}) {
   await screen.findByRole("heading", { name: "AI assistant", level: 1 });
   return { fake, store };
 }
+
+beforeEach(() => {
+  setModelChoice(null);
+});
 
 const card = (name: string) => screen.findByRole("region", { name });
 
@@ -27,10 +32,10 @@ describe("AI assistant", () => {
   });
 
   it("shows a configured provider as configured but still untested", async () => {
-    await open({ status: { provider: "anthropic", connected: true, model: "claude-opus-5-5", live_verified: false, message: "A provider is configured, but the live connection has not been tested yet." } });
+    await open({ status: { provider: "groq", connected: true, model: "llama-3.3-70b-versatile", live_verified: false, message: "A provider is configured, but the live connection has not been tested yet." } });
     const s = await card("Assistant status");
     expect(await within(s).findByText("Provider configured")).toBeInTheDocument();
-    expect(within(s).getByText("Model: claude-opus-5-5")).toBeInTheDocument();
+    expect(within(s).getByText("Model: llama-3.3-70b-versatile")).toBeInTheDocument();
     expect(within(s).getByText("Not tested live")).toBeInTheDocument();
   });
 
@@ -79,46 +84,11 @@ describe("AI assistant", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("already executed");
   });
 
-  it("adds a memory, and checks it first", async () => {
-    const user = userEvent.setup();
-    const { fake } = await open();
-    const m = await card("Memory");
-    expect(await within(m).findByText("Nothing saved yet.")).toBeInTheDocument();
-    await user.type(within(m).getByLabelText("Add a note"), "hi");
-    await user.click(within(m).getByRole("button", { name: "Save note" }));
-    expect(await within(m).findByRole("alert")).toHaveTextContent("at least 3 characters");
-    expect(fake.callsTo("POST", /memories$/)).toHaveLength(0);
-    await user.clear(within(m).getByLabelText("Add a note"));
-    await user.type(within(m).getByLabelText("Add a note"), "Prefers short answers");
-    await user.selectOptions(within(m).getByLabelText("Type"), "goal");
-    await user.click(within(m).getByRole("button", { name: "Save note" }));
-    await waitFor(() => expect(fake.callsTo("POST", /memories$/)[0].body).toEqual({ content: "Prefers short answers", kind: "goal" }));
-    const list = await within(m).findByRole("list", { name: "Saved notes" });
-    expect(within(list).getByText("Prefers short answers")).toBeInTheDocument();
-    expect(within(list).getByText("goal")).toBeInTheDocument();
-    expect(within(m).getByLabelText("Add a note")).toHaveValue("");
-  });
-
-  it("shows a duplicate-note error from the server", async () => {
-    const user = userEvent.setup();
-    await open({ memories: [mkMemory({ content: "Prefers short answers" })] });
-    const m = await card("Memory");
-    await user.type(await within(m).findByLabelText("Add a note"), "prefers short answers");
-    await user.click(within(m).getByRole("button", { name: "Save note" }));
-    expect(await within(m).findByRole("alert")).toHaveTextContent("already remembered");
-  });
-
-  it("labels who added each note and deletes one", async () => {
-    const user = userEvent.setup();
-    const { fake, store } = await open({ memories: [mkMemory({ id: 1, content: "Studies at night", source: "assistant", kind: "fact" }), mkMemory({ id: 2, content: "Likes brief replies" })] });
-    const list = await within(await card("Memory")).findByRole("list", { name: "Saved notes" });
-    const rows = within(list).getAllByRole("listitem");
-    expect(rows[0]).toHaveTextContent("added by assistant");
-    expect(rows[1]).toHaveTextContent("added by you");
-    await user.click(within(list).getByRole("button", { name: "Delete memory: Studies at night" }));
-    await waitFor(() => expect(fake.callsTo("DELETE", /memories\/1$/)).toHaveLength(1));
-    await waitFor(() => expect(within(list).queryByText("Studies at night")).not.toBeInTheDocument());
-    expect(store.memories.map((x) => x.id)).toEqual([2]);
+  it("has no memory section any more", async () => {
+    await open();
+    await card("Assistant status");
+    expect(screen.queryByRole("region", { name: "Memory" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/memory/i)).not.toBeInTheDocument();
   });
 
   it("is in the sidebar as a real page, not a placeholder", async () => {
@@ -127,7 +97,7 @@ describe("AI assistant", () => {
     expect(within(await screen.findByRole("navigation", { name: "Main" })).getByRole("link", { name: /AI assistant/ })).toHaveAttribute("aria-current", "page");
   });
 
-  const CONNECTED = { provider: "anthropic", connected: true, model: "claude-opus-5-5", live_verified: false, message: "A provider is configured, but the live connection has not been tested yet." };
+  const CONNECTED = { provider: "groq", connected: true, model: "llama-3.3-70b-versatile", live_verified: false, message: "A provider is configured, but the live connection has not been tested yet." };
 
   it("tests the connection on request and shows the real result", async () => {
     await open({ status: CONNECTED });
@@ -144,7 +114,8 @@ describe("AI assistant", () => {
     const log = await within(chat).findByRole("log", { name: "Conversation" });
     expect(await within(log).findByText("What is on today?")).toBeInTheDocument();
     expect(await within(log).findByText("You have 2 open tasks today.")).toBeInTheDocument();
-    expect(within(log).getByText(/Looked up: get_today_tasks/)).toBeInTheDocument();
+    expect(within(log).getByText("today tasks")).toBeInTheDocument();         // a friendly name, not get_today_tasks
+    expect(within(log).queryByText("get_today_tasks")).not.toBeInTheDocument();
   });
 
   it("says nothing has changed when the assistant proposes something, and lists it for approval", async () => {

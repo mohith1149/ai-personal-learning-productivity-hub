@@ -35,7 +35,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, and the AI 
 | Projects | Projects, milestones, development sessions. **Suggest with AI** (when a key is set) fills the empty fields and proposes milestones from a repo link and/or your description; you edit before creating. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
 | Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Settings | Your account (read-only), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
-| AI assistant | Chat window (shown once a key is set), 16 tools (10 read, 6 propose-only), approval queue, memory, and a **Test the connection** button. The assistant cannot change anything itself. |
+| AI assistant | Chat window (shown once a key is set) with a **model menu**, 15 tools (10 read, 5 propose-only), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
 
 ## Run it (Windows, development)
 
@@ -78,14 +78,22 @@ To use n8n instead, set `SCHEDULER_MODE=n8n`, set `AUTOMATION_API_KEY`, and impo
 
 ## AI assistant (optional)
 
-Off until you add a key. Pick one provider in `backend/.env`.
+Off until you add a key. `AI_PROVIDER` is the default provider; every provider that has a key also shows up in the chat's **model menu**, so
+you can switch between them (and between each provider's models) without touching `.env`. Your choice is remembered in the browser.
 
-**Free: Google Gemini** (free tier, rate limited; Google may use free-tier prompts to improve its products, so keep private data out):
+**Free: Groq** (generous free limits, a good default; Groq may keep free-tier prompts, so keep private data out):
+
+```
+AI_PROVIDER=groq
+GROQ_API_KEY=<key from https://console.groq.com/keys>
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+**Free but tightly limited: Google Gemini** (about 5 requests a minute, which a tool-using chat can hit; Google may use free-tier prompts):
 
 ```
 AI_PROVIDER=gemini
 GEMINI_API_KEY=<key from https://aistudio.google.com/apikey>
-GEMINI_MODEL=gemini-3.5-flash      # change it if Google has retired this name
 ```
 
 **Paid, pay-as-you-go: Anthropic**:
@@ -95,9 +103,11 @@ AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=<your key from console.anthropic.com>
 ```
 
+The model menu asks Groq and Gemini for their current model list (model names get retired), and falls back to a short built-in list.
+
 Restart the backend, open **AI assistant**, press **Test the connection** (a tiny real request). Only then does the chat window appear.
 Nothing the assistant proposes happens until you approve it. Keys never leave the backend. Both adapters are tested only against
-fake servers until you run them with a real key.
+fake servers until you run them with a real key (Gemini has been run live; Groq has not).
 
 ## Tests
 

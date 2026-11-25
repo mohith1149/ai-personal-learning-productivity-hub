@@ -555,6 +555,12 @@ Backend stays the single source of truth (n8n only triggers); idempotency keys p
 - Frontend `/assistant` (now a real page; the "coming soon" placeholder mechanism and its test were removed since nothing is unbuilt in the nav): connection status, approval queue, memory (add/delete), tool list. No chat box yet.
 - Tests: backend `test_assistant.py` (38), `test_assistant_api.py` (27); frontend `assistant.test.tsx` (11) + `fakeAssistant.ts`. Frontend test stability: `testTimeout` 20s (vite.config.ts) and Testing Library `asyncUtilTimeout` 10s because the full suite
   (253 tests) is slow under parallel load; two long tests were flaking at the old limits.
+- **Later update (Phase 6 live testing).** Gemini was run live and Groq was added. Memory was REMOVED (service, `/ai/memories`, the `remember` tool, the UI card and the prompt notes; the old `ai_memories`
+  table is left in existing databases, unused), so there are now 15 tools (10 read, 5 write). New: `app/ai/groq.py` (OpenAI-style chat completions; tool results are `role: "tool"` messages), `app/ai/catalog.py`
+  (`GET /ai/models`: live model list for Groq and Gemini, cached 10 minutes, curated fallback, default always included), per-request `provider`/`model` on chat, check and autofill (only providers with a key,
+  model names validated), `ToolCall.meta` (carries Gemini's `thoughtSignature`; stripped for Anthropic). Live findings: Gemini 3 models answer 400 on the second tool turn unless `thoughtSignature` is sent back; `gemini-2.5-flash`
+  returned 404 although listed; the Gemini free tier allows ~5 requests a minute. Tests now force `AI_PROVIDER=none` and blank keys so a real `.env` can't leak in. Frontend: redesigned chat (bubbles, markdown renderer in
+  `components/Markdown.tsx` that never injects HTML, suggestion chips, Enter to send, typing indicator, optimistic message) and a model menu remembered in localStorage (`hub.ai-model`). Groq is tested only against fake HTTP.
 - Not built: chat UI and live provider (Phase 6), OpenAI/Gemini adapters, weekly report tool, GitHub commit tool (Phase 4), streaming, conversation memory summarisation, notifying the model when a proposal is approved.
 
 ### Phase 3 verification pass (branch `feat/phase3-verification`)

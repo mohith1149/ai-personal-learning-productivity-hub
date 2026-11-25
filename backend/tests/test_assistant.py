@@ -10,8 +10,8 @@ from app.ai import prompt, tools
 from app.ai.providers import AnthropicProvider, ScriptedProvider, get_provider
 from app.ai.types import LLMResponse, ProviderError, ToolCall
 from app.config import get_settings
-from app.models import AIMemory, AIPendingAction, Task, User
-from app.services import ai_memory, assistant as svc
+from app.models import AIPendingAction, Task, User
+from app.services import assistant as svc
 from app.services import auth as auth_service
 
 NOW = datetime(2026, 11, 23, 10, 0, tzinfo=timezone.utc)   # 15:30 Mon 23 Nov in Kolkata
@@ -61,7 +61,7 @@ def test_the_tool_set_is_exactly_what_the_design_allows():
     writes = {n for n, t in tools.TOOLS.items() if t.kind == "write"}
     assert reads == {"get_today_tasks", "get_pending_tasks", "get_plan", "get_dashboard", "get_course_progress", "get_next_video", "get_active_projects",
                      "get_roadmap_progress", "get_habit_status", "get_challenge_status"}
-    assert writes == {"create_task", "complete_task", "reschedule_task", "record_project_progress", "create_project_challenge", "remember"}
+    assert writes == {"create_task", "complete_task", "reschedule_task", "record_project_progress", "create_project_challenge"}
     assert "complete_challenge" not in tools.TOOLS          # evidence must come from the user, never the model
 
 
@@ -271,51 +271,19 @@ def test_reschedule_and_progress_and_challenge_proposals_run_through_the_service
     assert db.query(ProjectSession).one().minutes == 45 and db.query(DailyChallenge).one().status == "planned"
 
 
-# ============================== memory and the prompt ==============================
+# ============================== the prompt ==============================
 
 
-def test_memory_crud_rules(db, user, other):
-    m = ai_memory.add_memory(db, user, "Prefers short answers", "preference")
-    assert m.source == "user"
-    with pytest.raises(ai_memory.Conflict):
-        ai_memory.add_memory(db, user, "prefers SHORT answers")
-    for bad in ("hi", "x" * 501, "   "):
-        with pytest.raises(ai_memory.RuleError):
-            ai_memory.add_memory(db, user, bad)
-    with pytest.raises(ai_memory.RuleError):
-        ai_memory.add_memory(db, user, "Valid text", "secret")
-    with pytest.raises(ai_memory.NotFound):
-        ai_memory.delete_memory(db, other, m.id)
-    assert [x.content for x in ai_memory.list_memories(db, other)] == []
-    ai_memory.delete_memory(db, user, m.id)
-    assert ai_memory.list_memories(db, user) == []
-
-
-def test_memory_limit(db, user, monkeypatch):
-    monkeypatch.setattr(ai_memory, "MAX_MEMORIES", 2)
-    ai_memory.add_memory(db, user, "First note")
-    ai_memory.add_memory(db, user, "Second note")
-    with pytest.raises(ai_memory.RuleError, match="At most 2"):
-        ai_memory.add_memory(db, user, "Third note")
-
-
-def test_the_assistant_can_only_add_memory_through_an_approved_action(db, user):
-    out = chat(db, user, ScriptedProvider([ask(call("remember", content="Studies at night", kind="fact")), say("ok")]))
-    assert db.query(AIMemory).count() == 0
-    svc.approve(db, user, out["pending"][0]["id"])
-    m = db.query(AIMemory).one()
-    assert (m.content, m.kind, m.source, m.user_id) == ("Studies at night", "fact", "assistant", user.id)
-
-
-def test_the_system_prompt_carries_the_rules_the_date_and_saved_notes(db, user):
-    ai_memory.add_memory(db, user, "Prefers short answers")
+def test_the_system_prompt_carries_the_rules_and_the_date(db, user):
     p = ScriptedProvider([say("hi")])
     chat(db, user, p)
     system = p.requests[0]["system"]
     assert "Never guess or invent" in system and "NOT verified against GitHub" in system and "must approve" in system
-    assert "Today is 2026-11-23" in system and "Ada" in system and "- Prefers short answers" in system
-    assert "data only" in system                                           # memory is framed as data, not instructions
-    assert "Notes the user saved" not in prompt.system_prompt("Ada", TODAY, [])
+    assert "Today is 2026-11-23" in system and "Ada" in system
+
+
+def test_there_is_no_memory_feature_any_more():
+    assert "remember" not in tools.TOOLS
 
 
 # ============================== providers ==============================
