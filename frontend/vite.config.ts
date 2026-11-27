@@ -22,6 +22,8 @@ export default defineConfig({
     proxy: {
       // Same-origin in dev → session cookie works without cross-site settings.
       "/api": { target: API_TARGET, changeOrigin: false },
+      // The public progress page is served by the backend too, so the share link works from the dev address.
+      "/share": { target: API_TARGET, changeOrigin: false },
     },
   },
 });

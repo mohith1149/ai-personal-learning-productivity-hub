@@ -43,6 +43,8 @@ class UserSettings(TimestampMixin, Base):
     # Hours you have each weekday, as 7 comma-separated minute counts Monday..Sunday ("240,240,240,240,240,120,120"). None = not set,
     # so the planner never flags a day as overloaded.
     weekday_minutes: Mapped[str | None] = mapped_column(String(40))
+    # Secret in the link of the public progress page. None = sharing is off. A new value replaces (and so kills) the old link.
+    share_token: Mapped[str | None] = mapped_column(String(64), unique=True)
 
     user: Mapped[User] = relationship(back_populates="settings")
 

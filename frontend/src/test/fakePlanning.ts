@@ -1,6 +1,7 @@
 /** Rest days and planning preferences for the fake API (installed by default, like notifications). Real rules are tested in pytest. */
 import type { Goal } from "../api/goals";
 import type { Preferences, RestMonth } from "../api/planner";
+import type { Share } from "../api/share";
 import type { Logged, RunningTimer } from "../api/timer";
 import type { Handler } from "./fakeApi";
 
@@ -12,9 +13,10 @@ export type FakePlanning = {
   timer: RunningTimer | null;
   /** What the fake logs when a timer is stopped (minutes come from the request). */
   stopped: Logged[];
+  share: Share;
 };
 
-export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, rest_days_per_month: 4 }, restDays: [], today, goals: [], timer: null, stopped: [] });
+export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, rest_days_per_month: 4 }, restDays: [], today, goals: [], timer: null, stopped: [], share: { enabled: false, token: null, path: null } });
 
 export function restMonth(store: FakePlanning, month: string): RestMonth {
   const days = store.restDays.filter((d) => d.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));
@@ -42,6 +44,16 @@ export function planningHandler(store: FakePlanning): Handler {
     if (path === "/api/planner/preferences" && method === "PATCH") {
       Object.assign(store.prefs, body);
       return Response.json(store.prefs);
+    }
+    if (path === "/api/share" && method === "GET") return Response.json(store.share);
+    if (path === "/api/share" && method === "POST") {
+      const token = `tok${Math.random().toString(36).slice(2)}${"x".repeat(30)}`;
+      store.share = { enabled: true, token, path: `/share/${token}` };
+      return Response.json(store.share, { status: 201 });
+    }
+    if (path === "/api/share" && method === "DELETE") {
+      store.share = { enabled: false, token: null, path: null };
+      return new Response(null, { status: 204 });
     }
     if (path === "/api/goals" && method === "GET") return Response.json(store.goals);
     if (path === "/api/timer" && method === "GET") return Response.json(store.timer);

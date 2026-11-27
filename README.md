@@ -34,6 +34,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, weekly and 
 | Projects | Projects, milestones, development sessions. **Suggest with AI** (when a key is set) fills the empty fields and proposes milestones from a repo link and/or your description; you edit before creating. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
 | Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Reports | **Weekly and monthly reports** from your own records: items finished, study and project time, habit check-ins, plan completion and the daily challenge, per day and in total, compared with the same days of the previous period. Charts have a table view. Nothing is estimated; days that have not happened yet are blank. |
+| Share | **Settings → Share your progress** makes a private link to a read-only page: your streaks, hours, **verified** commits (first line, short hash, date), projects, finished topics and completed courses. Tasks, habits, notes, write-ups, your e-mail and private repositories are never shown. Make a new link to kill the old one, or stop sharing. The weekly report e-mail includes the link while sharing is on. |
 | Timer | A **Timer** button on tasks, lessons, courses, roadmap topics, projects and planner rows starts one stopwatch (shown at the top of every page). **Stop and log** adds the time to the project (a development session), the course or the topic, and to the task's actual time; **Discard** logs nothing. It keeps running if you reload. |
 | Settings | Your account (read-only), **planning** (hours per weekday, rest days per month), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
 | AI assistant | Chat window (shown once a key is set) with a **model menu**, 19 tools (14 read, 5 propose-only; includes a weekly report and slipping tasks), **Morning check-in / Evening check-out** buttons, a GitHub repo lookup (paste a repo link in the chat), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
@@ -136,7 +137,7 @@ Run `npm test` from a path with an uppercase drive letter (`D:\...`); from Git B
 ## Deploying and backups
 
 The backend serves only `/api`; put a reverse proxy in front that serves `frontend/dist` and forwards `/api`, run one worker, set
-`ENVIRONMENT=production` and `COOKIE_SECURE=true`, and back up with SQLite's backup command. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`ENVIRONMENT=production` and `COOKIE_SECURE=true`, and back up with SQLite's backup command. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). **Containers:** `docker compose up --build -d` runs the whole app (Docker or Rancher Desktop); see the Containers section there.
 
 ## Security notes
 

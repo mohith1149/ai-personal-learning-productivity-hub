@@ -1,0 +1,35 @@
+# Run the whole app in containers (Rancher Desktop with the "dockerd (moby)" engine, or Docker Desktop):
+#
+#   1. copy backend/.env.example to backend/.env and fill it in (at least SECRET_KEY, 32+ characters)
+#   2. docker compose up --build -d
+#   3. open http://localhost:8080 and create your account
+#
+# Your data is in the named volume "hub-data" and survives rebuilds. See docs/DEPLOYMENT.md ("Containers").
+services:
+  backend:
+    build: ./backend
+    env_file: backend/.env          # secrets and keys stay in this file, never in the image
+    environment:                    # these override the same names in backend/.env
+      ENVIRONMENT: production
+      DATABASE_URL: sqlite:////data/hub.db
+      FRONTEND_URL: ${PUBLIC_URL:-http://localhost:8080}
+      BACKEND_URL: ${PUBLIC_URL:-http://localhost:8080}
+      SCHEDULER_MODE: internal
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}   # set to true when you serve it over https
+    volumes:
+      - hub-data:/data
+    restart: unless-stopped
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${HUB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  hub-data:

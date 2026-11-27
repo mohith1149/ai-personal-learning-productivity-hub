@@ -76,6 +76,8 @@ def create_app() -> FastAPI:
         return {"status": "ok", "database": "ok", "version": app.version}
 
     app.include_router(api_router, prefix="/api")
+    from app.routers import share
+    app.include_router(share.public_router)  # the public progress page lives at /share/<token>, outside /api
     return app
 
 
