@@ -88,8 +88,8 @@ The model menu fetches each provider's current model list (names get retired) an
 
 What the assistant can and cannot do:
 
-- It has 17 tools. The 12 read tools (today's and pending tasks, plan, dashboard, courses, next videos, active projects, roadmap, habits,
-  challenge, weekly report, GitHub repo lookup) run immediately. The 5 write tools (create, complete and reschedule a task; log project
+- It has 18 tools. The 13 read tools (today's and pending tasks, plan, dashboard, courses, next videos, active projects, roadmap, habits,
+  challenge, weekly report, slipping tasks, GitHub repo lookup) run immediately. The 5 write tools (create, complete and reschedule a task; log project
   progress; plan a challenge) only **propose** a change, which waits in the approval queue on the AI assistant page.
 - It cannot complete a challenge, delete anything or change anything without your approval.
 - **Morning check-in** and **Evening check-out** buttons start a guided review of your day.

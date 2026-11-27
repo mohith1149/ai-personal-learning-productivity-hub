@@ -18,7 +18,7 @@ Rules:
     and are left out of the day's percentage. Completed activities can't be excused; future days can't be excused.
   * The day's percentage is completed / (all activities that count, excused ones left out), floored.
 """
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -31,7 +31,7 @@ from app.models import (
 from app.schemas import habits as hs
 from app.schemas import planner as s
 from app.schemas import tasks as ts
-from app.services import courses, habits, roadmap, tasks, videos
+from app.services import courses, habits, prefs, rest, roadmap, tasks, videos
 
 
 class NotFound(Exception):
@@ -47,15 +47,20 @@ class Conflict(Exception):
 
 
 KIND_ORDER = {"task": 0, "habit": 1, "lesson": 2, "video": 3, "topic": 4, "project": 5}
+REST_REASON = "Rest day"
 STATUS_ORDER = {"overdue": 0, "pending": 1, "completed": 2, "excused": 3}
 TASK_OPEN = tasks.OPEN_STATUSES
 
 
+SLIP_AT = 3  # a task moved to another day this many times counts as "slipping"
+
+
 def _item(kind: str, ref_id: int, title: str, status: str, link: str, *, subtitle=None, due_date=None, minutes=None, url=None,
-          can_complete=True, can_reschedule=False) -> dict:
+          can_complete=True, can_reschedule=False, carry_count=0) -> dict:
     return {"key": f"{kind}:{ref_id}", "kind": kind, "ref_id": ref_id, "title": title, "subtitle": subtitle, "status": status,
             "due_date": due_date, "minutes": minutes, "excuse_reason": None, "can_complete": can_complete,
-            "can_reschedule": can_reschedule, "can_excuse": False, "link": link, "url": url}
+            "can_reschedule": can_reschedule, "can_excuse": False, "link": link, "url": url,
+            "carry_count": carry_count, "slipping": carry_count >= SLIP_AT}
 
 
 # ============================== building the day ==============================
@@ -86,7 +91,7 @@ def _tasks(db: Session, user: User, day: date, today: date, start: datetime, end
         if t.carry_count:
             sub.append(f"moved {t.carry_count}×")
         out.append(_item("task", t.id, t.title, status, "/tasks", subtitle=" · ".join(sub) or None, due_date=t.due_date,
-                         minutes=t.estimated_minutes, can_reschedule=True))
+                         minutes=t.estimated_minutes, can_reschedule=True, carry_count=t.carry_count))
     return out
 
 
@@ -108,7 +113,7 @@ def _lessons(db: Session, user: User, day: date, today: date, start: datetime, e
             nxt = courses.next_lesson(course)
             if nxt:
                 out.append(_item("lesson", nxt["id"], nxt["title"], "pending", f"/courses/{course.id}",
-                                 subtitle=f"{course.title} · {nxt['module_title']}", url=nxt["url"]))
+                                 subtitle=f"{course.title} · {nxt['module_title']}", url=nxt["url"], minutes=nxt.get("duration_minutes")))
     return out
 
 
@@ -187,6 +192,17 @@ def _projects(db: Session, user: User, day: date, today: date) -> list[dict]:
     return out
 
 
+def _load(db: Session, user: User, day: date, counted: list[dict], rest_day: bool) -> dict:
+    """How much the day asks for against the hours you said you have. Only items with a time (a task's estimate, a lesson or video length,
+    minutes already logged) can be added up; the rest are counted as `unestimated` instead of being guessed."""
+    week = prefs.weekday_minutes(db, user)
+    available = None if week is None else week[day.weekday()]
+    planned = sum(i["minutes"] or 0 for i in counted)
+    return {"rest_day": rest_day, "planned_minutes": planned, "available_minutes": available,
+            "unestimated": sum(i["minutes"] is None and i["status"] != "completed" for i in counted),
+            "overloaded": bool(available is not None and not rest_day and planned > available)}
+
+
 def build_day(db: Session, user: User, day: date, now: datetime | None = None) -> dict:
     today = user_today(user, now)
     start, end = local_day_bounds_utc(user, day)
@@ -204,6 +220,12 @@ def build_day(db: Session, user: User, day: date, now: datetime | None = None) -
         elif it["kind"] != "habit" and day != today:
             it["can_complete"] = False  # non-habit items are completed on today's plan
     # Stable sort: within a status and type the owning feature's own order is kept (your video plan order, task priority, ...).
+    rest_day = day in rest.set_of(db, user, day, day)
+    if rest_day:  # a planned rest day: whatever is still open is left out of the day's percentage and never shown as overdue
+        for it in items:
+            if it["status"] in ("pending", "overdue"):
+                it["status"], it["excuse_reason"] = "excused", REST_REASON
+            it["can_excuse"] = False
     items.sort(key=lambda i: (STATUS_ORDER[i["status"]], KIND_ORDER[i["kind"]]))
 
     counted = [i for i in items if i["status"] != "excused"]
@@ -216,6 +238,7 @@ def build_day(db: Session, user: User, day: date, now: datetime | None = None) -
         "percent": (100 * done) // len(counted) if counted else 0, "study_minutes": int(study), "dev_minutes": int(dev),
         "by_kind": [{"kind": k, "total": sum(i["kind"] == k for i in counted), "completed": sum(i["kind"] == k and i["status"] == "completed" for i in counted)}
                     for k in KIND_ORDER if any(i["kind"] == k for i in counted)],
+        **_load(db, user, day, counted, rest_day),
     }
     return {"date": day, "is_today": day == today, "items": items, "summary": summary}
 
@@ -332,3 +355,49 @@ def remove_excuse(db: Session, user: User, ref: s.ItemRef, now: datetime | None 
     db.delete(row)
     db.commit()
     return build_day(db, user, ref.date, now)
+
+
+# ============================== rolling over to tomorrow ==============================
+
+
+def _open_tasks_today(db: Session, user: User, now: datetime | None) -> list[Task]:
+    """The open tasks on today's plan that aren't excused, i.e. the ones the day left unfinished."""
+    plan = build_day(db, user, user_today(user, now), now)
+    ids = [i["ref_id"] for i in plan["items"] if i["kind"] == "task" and i["status"] in ("pending", "overdue")]
+    if not ids:
+        return []
+    return list(db.scalars(select(Task).where(Task.user_id == user.id, Task.id.in_(ids), Task.status.in_(TASK_OPEN)).order_by(Task.priority, Task.id)))
+
+
+def roll_over(db: Session, user: User, data: s.RollOverIn, now: datetime | None = None) -> dict:
+    """Move today's unfinished tasks to tomorrow (all of them, or just `task_ids`) and report how loaded tomorrow becomes.
+    With `dry_run` nothing is saved: it is the preview. Lessons, videos, roadmap topics and habits need no moving: they appear on their own
+    tomorrow. Each move adds one to the task's `carry_count`, which is what the "slipping" flag counts."""
+    today = user_today(user, now)
+    tomorrow = today + timedelta(days=1)
+    wanted = set(data.task_ids) if data.task_ids is not None else None
+    moved = []
+    for t in _open_tasks_today(db, user, now):
+        if (wanted is not None and t.id not in wanted) or t.scheduled_date == tomorrow:
+            continue
+        t.carried_from_date = t.scheduled_date or t.carried_from_date
+        t.carry_count += 1
+        t.scheduled_date = tomorrow
+        moved.append({"task_id": t.id, "title": t.title, "carry_count": t.carry_count, "minutes": t.estimated_minutes, "slipping": t.carry_count >= SLIP_AT})
+    db.flush()
+    nxt = build_day(db, user, tomorrow, now)["summary"]
+    if data.dry_run:
+        db.rollback()
+    else:
+        db.commit()
+    return {"dry_run": data.dry_run, "moved": moved,
+            "tomorrow": {"date": tomorrow, "total": nxt["total"], "planned_minutes": nxt["planned_minutes"], "available_minutes": nxt["available_minutes"],
+                         "overloaded": nxt["overloaded"], "unestimated": nxt["unestimated"], "rest_day": nxt["rest_day"]}}
+
+
+def slipping_tasks(db: Session, user: User) -> list[dict]:
+    """Open tasks that have been moved to another day SLIP_AT or more times, worst first."""
+    rows = db.scalars(select(Task).where(Task.user_id == user.id, Task.status.in_(TASK_OPEN), Task.carry_count >= SLIP_AT)
+                      .order_by(Task.carry_count.desc(), Task.id))
+    return [{"task_id": t.id, "title": t.title, "moved_times": t.carry_count, "scheduled_date": t.scheduled_date, "due_date": t.due_date,
+             "estimated_minutes": t.estimated_minutes, "first_planned_for": t.carried_from_date} for t in rows]

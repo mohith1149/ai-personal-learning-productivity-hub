@@ -1,4 +1,4 @@
-import { CalendarClock, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, RotateCcw, Undo2 } from "lucide-react";
+import { CalendarClock, Check, ChevronLeft, ChevronRight, ExternalLink, EyeOff, MessageCircleQuestion, RotateCcw, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStatus } from "../../api/auth";
@@ -17,6 +17,7 @@ import {
 import { FormError, TextArea, TextInput } from "../../components/forms";
 import { Modal } from "../../components/Modal";
 import { Badge, Button, Card, EmptyState, ErrorNotice, PageHeader, ProgressBar, Spinner, cx } from "../../components/ui";
+import { LoadNotice, RestDayCard, RollOverButton, formatMinutes } from "./PlanningPanel";
 import { addDays, formatDay, todayIn } from "../../lib/dates";
 
 const SECTIONS: { status: ItemStatus; title: string }[] = [
@@ -25,8 +26,6 @@ const SECTIONS: { status: ItemStatus; title: string }[] = [
   { status: "completed", title: "Completed" },
   { status: "excused", title: "Excused" },
 ];
-
-const formatMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -108,7 +107,7 @@ function ExcuseModal({ item, day, onClose }: { item: PlanItem; day: string; onCl
   );
 }
 
-function ItemRow({ item, day, today }: { item: PlanItem; day: string; today: string }) {
+function ItemRow({ item, day, today, restDay }: { item: PlanItem; day: string; today: string; restDay: boolean }) {
   const complete = useCompleteItem();
   const reopen = useReopenItem();
   const unexcuse = useUnexcuse();
@@ -122,6 +121,7 @@ function ItemRow({ item, day, today }: { item: PlanItem; day: string; today: str
     <li className="py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Badge tone={item.kind === "task" ? "neutral" : "brand"}>{KIND_LABEL[item.kind]}</Badge>
+        {item.slipping && <Badge tone="warn">Slipping: moved {item.carry_count}×</Badge>}
         <div className="min-w-0 flex-1">
           <p className={cx("text-sm font-medium", done || item.status === "excused" ? "text-slate-500 line-through dark:text-slate-500" : "text-slate-900 dark:text-white")}>
             <Link to={item.link} className="hover:underline">
@@ -133,6 +133,16 @@ function ItemRow({ item, day, today }: { item: PlanItem; day: string; today: str
             {item.due_date && <>{item.subtitle ? " · " : ""}due {formatDay(item.due_date, today)}</>}
             {item.minutes ? <>{item.subtitle || item.due_date ? " · " : ""}~{formatMinutes(item.minutes)}</> : null}
           </p>
+          {item.slipping && item.status !== "completed" && (
+            <p className="text-xs text-amber-800 dark:text-amber-300">
+              <Link
+                to={`/assistant?ask=${encodeURIComponent(`Why does "${item.title}" keep slipping? I've moved it ${item.carry_count} times.`)}`}
+                className="inline-flex items-center gap-1 font-medium hover:underline"
+              >
+                <MessageCircleQuestion className="h-3.5 w-3.5" aria-hidden /> Ask the assistant why
+              </Link>
+            </p>
+          )}
           {item.status === "excused" && <p className="text-xs italic text-slate-500 dark:text-slate-400">Excused: {item.excuse_reason}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-1">
@@ -162,7 +172,7 @@ function ItemRow({ item, day, today }: { item: PlanItem; day: string; today: str
             </Button>
           )}
           {item.status === "excused" ? (
-            <Button variant="ghost" icon={Undo2} loading={unexcuse.isPending} onClick={() => unexcuse.mutate(ref)} aria-label={`Remove excuse for ${item.title}`} className="px-2.5 py-1.5">
+            restDay && item.excuse_reason === "Rest day" ? null : <Button variant="ghost" icon={Undo2} loading={unexcuse.isPending} onClick={() => unexcuse.mutate(ref)} aria-label={`Remove excuse for ${item.title}`} className="px-2.5 py-1.5">
               Remove excuse
             </Button>
           ) : (
@@ -257,6 +267,9 @@ export function PlannerPage() {
       ) : (
         <div className="space-y-4">
           <Summary plan={plan.data} />
+          <RestDayCard plan={plan.data} day={current} today={today} />
+          <LoadNotice plan={plan.data} />
+          <RollOverButton plan={plan.data} day={current} today={today} />
           {current > today && <p className="text-sm text-slate-500 dark:text-slate-400">Future days only show tasks scheduled for them. Lessons, videos and habits are suggested on the day itself.</p>}
           {plan.data.items.length === 0 ? (
             <EmptyState icon={CalendarClock} title="Nothing planned for this day">
@@ -273,7 +286,7 @@ export function PlannerPage() {
                   </h2>
                   <ul aria-label={`${title} activities`} className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
                     {items.map((i) => (
-                      <ItemRow key={i.key} item={i} day={current} today={today} />
+                      <ItemRow key={i.key} item={i} day={current} today={today} restDay={plan.data.summary.rest_day} />
                     ))}
                   </ul>
                 </Card>

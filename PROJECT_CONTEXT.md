@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4 to 8 complete. All planned phases are done.
+Last updated: 2026-11-25 — Phases 4 to 9 complete. Phase 9 (sustainable pace) added rest days, daily hours with overload flag, roll-over and slipping tasks.
 ---
 
 ## 1. Purpose
@@ -639,3 +639,27 @@ GitHub OAuth App client ID/secret or PAT (Phase 4).
   `LearningResource`/`course_lessons.lesson_type='video'` idea from Phase 1 is superseded by the dedicated `videos` table.
 - Test tooling: the `/videos` page is covered by Vitest with a fake API; there is still no real-browser run in the repo (see the Edge-script
   note above). Shell quoting: write multi-line files with the editor tool, not bash heredocs (one failed silently this milestone).
+
+
+---
+
+## Phase 9: a pace you can keep (rest days, hours, roll-over, slipping)
+
+Requested by a reviewer (items 2, 6 and 9 of their list); the rest of the list is Phases 10 and 11 (goals and pace warnings, a timer that logs
+time, a shareable progress page and weekly e-mail, containers).
+
+- **Rest days** (`rest_days` table, `services/rest.py`, `/api/rest-days`): at most `user_settings.rest_days_per_month` (default 4) per calendar month.
+  Allowed for today, the last 3 days and up to a year ahead; not on a day whose challenge is completed. Effects: the challenge streak skips the
+  day (like an excused day), it is not "missed", the planner turns that day's open items into excused ("Rest day") so nothing is overdue, and
+  reports count it as excused. **Habit streaks are not changed.** The calendar has a new `rest` status; `Stats.rest_days` and `Today.rest_day`
+  were added.
+- **Daily hours** (`user_settings.weekday_minutes`, "m,t,w,t,f,s,s" minutes, null = not set; `/api/planner/preferences`): `DaySummary` gained
+  `planned_minutes`, `available_minutes`, `unestimated`, `overloaded`, `rest_day`. Only items with a time count (task estimate, lesson length,
+  video length, minutes already logged); open items without one are counted in `unestimated`, never guessed. A rest day is never overloaded.
+- **Roll-over** (`POST /api/planner/roll-over`, `dry_run` previews): moves today's open, non-excused tasks to tomorrow (all, or `task_ids`),
+  adds one to `carry_count`, and returns tomorrow's load. Lessons, videos, topics and habits reappear on their own, so only tasks move.
+- **Slipping** = an open task with `carry_count >= 3` (`planner.SLIP_AT`). `PlanItem` has `carry_count` and `slipping`; the new read tool
+  `get_slipping_items` (tool 18) and a prompt rule make the assistant ask ONE short question about why before proposing a change (split it, move
+  it, or drop it, each needing approval). The planner links to `/assistant?ask=...`, which pre-fills the chat box without sending.
+- Migration `7695ccbb61ae` adds `rest_days` and the two settings columns. Tests: `tests/test_phase9.py`, `tests/test_phase9_api.py`,
+  `src/test/phase9.test.tsx`.

@@ -24,3 +24,14 @@ class PlannerExcusal(IdMixin, OwnedMixin, TimestampMixin, Base):
     ref_id: Mapped[int] = mapped_column(Integer, nullable=False)  # id of the task / lesson / video / topic / habit / project
     date: Mapped[DateT] = mapped_column(Date, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RestDay(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """A planned rest day (sick day, holiday). It keeps the daily-challenge streak alive, is not counted as missed, and the planner
+    stops flagging that day's open items. The number per calendar month is capped (`UserSettings.rest_days_per_month`)."""
+
+    __tablename__ = "rest_days"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_rest_days_user_date"),)
+
+    date: Mapped[DateT] = mapped_column(Date, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200))

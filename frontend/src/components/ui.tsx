@@ -145,14 +145,16 @@ export function StatusBadge({ status }: { status: Status }) {
   return <span className={cx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", s.cls)}>{s.label}</span>;
 }
 
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "brand" }) {
+export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "brand" | "warn" }) {
   return (
     <span
       className={cx(
         "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
         tone === "brand"
           ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-400"
-          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+          : tone === "warn"
+            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
       )}
     >
       {children}

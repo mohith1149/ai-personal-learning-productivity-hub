@@ -41,7 +41,8 @@ def test_every_endpoint_requires_login(client, method, path):
 def test_empty_plan_shape(c):
     p = plan(c)
     assert p["date"] == TODAY.isoformat() and p["is_today"] is True and p["items"] == []
-    assert set(p["summary"]) == {"total", "completed", "pending", "overdue", "excused", "percent", "study_minutes", "dev_minutes", "by_kind"}
+    assert set(p["summary"]) == {"total", "completed", "pending", "overdue", "excused", "percent", "study_minutes", "dev_minutes", "by_kind",
+                                "rest_day", "planned_minutes", "available_minutes", "unestimated", "overloaded"}
 
 
 def test_other_days_and_bad_dates(c):

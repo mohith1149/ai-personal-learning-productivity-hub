@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routers import assistant, auth, challenges, courses, dashboard, github, habits, notifications, planner, projects, reports, roadmap, tasks, videos, youtube
+from app.routers import assistant, auth, challenges, courses, dashboard, github, habits, notifications, planner, projects, reports, rest_days, roadmap, tasks, videos, youtube
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -28,3 +28,4 @@ api_router.include_router(notifications.router)
 api_router.include_router(notifications.automation_router)
 api_router.include_router(assistant.router)
 api_router.include_router(reports.router)
+api_router.include_router(rest_days.router)

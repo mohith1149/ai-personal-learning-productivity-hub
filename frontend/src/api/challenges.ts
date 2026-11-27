@@ -3,10 +3,10 @@ import { api } from "./client";
 
 export type Mode = "new_project" | "existing_project";
 export type ChallengeStatus = "planned" | "in_progress" | "completed" | "missed" | "excused";
-export type CalendarStatus = ChallengeStatus | "none";
+export type CalendarStatus = ChallengeStatus | "rest" | "none"; // "rest" = a planned rest day
 
 export const STATUS_LABEL: Record<CalendarStatus, string> = {
-  planned: "Planned", in_progress: "In progress", completed: "Completed", missed: "Missed", excused: "Excused", none: "Nothing planned",
+  planned: "Planned", in_progress: "In progress", completed: "Completed", missed: "Missed", excused: "Excused", rest: "Rest day", none: "Nothing planned",
 };
 
 export type Challenge = {
@@ -43,6 +43,7 @@ export type Suggestion = {
 export type Stats = {
   completed: number;
   excused: number;
+  rest_days: number;
   missed: number;
   completion_rate: number;
   current_streak: number;
@@ -51,7 +52,7 @@ export type Stats = {
   first_day: string | null;
 };
 
-export type TodayView = { date: string; challenge: Challenge | null; stats: Stats; suggestions: Suggestion[] };
+export type TodayView = { date: string; rest_day: boolean; challenge: Challenge | null; stats: Stats; suggestions: Suggestion[] };
 export type CalendarDay = { date: string; status: CalendarStatus; project_title: string | null; challenge_id: number | null };
 export type CalendarView = { start: string; end: string; days: CalendarDay[]; stats: Stats };
 

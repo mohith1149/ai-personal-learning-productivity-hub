@@ -160,7 +160,7 @@ def next_lesson(course: Course) -> dict | None:
         for lesson in module.lessons:
             if lesson.status != "completed":
                 return {"id": lesson.id, "title": lesson.title, "module_id": module.id,
-                        "module_title": module.title, "status": lesson.status, "url": lesson.url}
+                        "module_title": module.title, "status": lesson.status, "url": lesson.url, "duration_minutes": lesson.duration_minutes}
     return None
 
 

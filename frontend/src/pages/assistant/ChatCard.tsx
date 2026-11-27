@@ -1,5 +1,6 @@
 import { Bot, Plus, SendHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useChat, useConversation, type ChatMessage } from "../../api/assistant";
 import { controlClass } from "../../components/forms";
 import { Markdown } from "../../components/Markdown";
@@ -58,7 +59,8 @@ function Typing() {
 /** The chat window. Only shown when a provider is configured. Anything the assistant wants to change appears in "Waiting for your approval". */
 export function ChatCard() {
   const [conversationId, setConversationId] = useState<number | null>(null);
-  const [text, setText] = useState("");
+  const [params] = useSearchParams();
+  const [text, setText] = useState(() => (params.get("ask") ?? "").slice(0, 2000)); // e.g. from "Ask the assistant why" on the planner
   const [sending, setSending] = useState<string | null>(null); // shown as your bubble while the answer is on its way
   const [proposed, setProposed] = useState(0);
   const convo = useConversation(conversationId);
