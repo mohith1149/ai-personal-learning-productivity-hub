@@ -30,6 +30,7 @@ const formatMinutes = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60
 const TONE: Record<CalendarStatus, string> = {
   completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   excused: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+  rest: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
   missed: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
   in_progress: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   planned: "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
@@ -48,16 +49,17 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 function StatsCard({ stats }: { stats: Stats }) {
   return (
     <Card aria-label="Challenge statistics">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <Stat label="Current streak" value={`${stats.current_streak} ${stats.current_streak === 1 ? "day" : "days"}`} />
         <Stat label="Longest streak" value={`${stats.longest_streak} ${stats.longest_streak === 1 ? "day" : "days"}`} />
         <Stat label="Completed" value={stats.completed} />
         <Stat label="Missed" value={stats.missed} />
         <Stat label="Excused" value={stats.excused} />
+        <Stat label="Rest days" value={stats.rest_days} />
         <Stat label="Time" value={formatMinutes(stats.total_minutes)} />
       </dl>
       <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-        {stats.first_day ? `Since ${stats.first_day}: ${stats.completion_rate}% of days completed. Excused days don't break a streak.` : "Your streak starts with your first challenge."}
+        {stats.first_day ? `Since ${stats.first_day}: ${stats.completion_rate}% of days completed. Excused and rest days don't break a streak.` : "Your streak starts with your first challenge."}
       </p>
     </Card>
   );
@@ -407,7 +409,7 @@ function CalendarCard({ days, today }: { days: CalendarDay[]; today: string }) {
         })}
       </ul>
       <ul aria-label="Legend" className="mt-3 flex flex-wrap gap-2 text-xs">
-        {(["completed", "excused", "missed", "in_progress", "planned"] as const).map((s) => (
+        {(["completed", "excused", "rest", "missed", "in_progress", "planned"] as const).map((s) => (
           <li key={s} className={cx("rounded px-2 py-0.5", TONE[s])}>
             {STATUS_LABEL[s]}
           </li>
@@ -465,6 +467,11 @@ export function ChallengePage() {
             Evidence is entered by you and is shown as <strong>Unverified</strong>. Checking commits against GitHub arrives in a later phase.
           </p>
           <StatsCard stats={today.data.stats} />
+          {today.data.rest_day && (
+            <p role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Today is a planned rest day. Your streak is safe; if you do the challenge anyway it still counts. Manage rest days on the <a href="/planner" className="font-medium underline">Daily planner</a>.
+            </p>
+          )}
           <TodayCard challenge={today.data.challenge} suggestions={today.data.suggestions} date={today.data.date} />
           {calendar.isError ? <ErrorNotice error={calendar.error} onRetry={() => calendar.refetch()} /> : calendar.data ? <CalendarCard days={calendar.data.days} today={today.data.date} /> : null}
           {history.isError ? (

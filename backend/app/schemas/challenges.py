@@ -11,7 +11,7 @@ from app.schemas.projects import Minutes, normalise_repo_url
 
 Mode = Literal["new_project", "existing_project"]
 Status = Literal["planned", "in_progress", "completed", "missed", "excused"]
-CalendarStatus = Literal["planned", "in_progress", "completed", "missed", "excused", "none"]
+CalendarStatus = Literal["planned", "in_progress", "completed", "missed", "excused", "rest", "none"]
 
 _SHA = re.compile(r"^[0-9a-f]{7,40}$")
 
@@ -124,6 +124,7 @@ class Suggestion(BaseModel):
 class Stats(BaseModel):
     completed: int
     excused: int
+    rest_days: int = 0  # planned rest days up to today; like excused days they neither add to nor break the streak
     missed: int
     completion_rate: int  # completed / (completed + missed), floored
     current_streak: int
@@ -134,6 +135,7 @@ class Stats(BaseModel):
 
 class Today(BaseModel):
     date: DateT
+    rest_day: bool = False  # today is a planned rest day
     challenge: ChallengeOut | None
     stats: Stats
     suggestions: list[Suggestion]

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.timeutil import user_now, user_today
 from app.models import EmailNotification, User, UserSettings
-from app.services import challenges, planner
+from app.services import challenges, planner, prefs
 from app.services.mailer import Mailer, MailError
 
 MAX_ATTEMPTS = 3
@@ -30,10 +30,7 @@ class RuleError(ValueError):
 
 
 def get_settings_row(db: Session, user: User) -> UserSettings:
-    if user.settings is None:
-        user.settings = UserSettings(reminder_email=user.email)
-        db.flush()
-    return user.settings
+    return prefs.settings_row(db, user)
 
 
 # ============================== content ==============================

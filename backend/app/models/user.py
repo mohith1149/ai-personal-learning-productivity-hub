@@ -38,6 +38,11 @@ class UserSettings(TimestampMixin, Base):
     weekly_report_time: Mapped[str] = mapped_column(String(5), default="18:00", nullable=False)
     daily_learning_minutes: Mapped[int] = mapped_column(Integer, default=120, nullable=False)
     bbg_daily_target: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    # Planned rest days allowed per calendar month (keeps the streak alive; see services/rest.py).
+    rest_days_per_month: Mapped[int] = mapped_column(Integer, default=4, server_default="4", nullable=False)
+    # Hours you have each weekday, as 7 comma-separated minute counts Monday..Sunday ("240,240,240,240,240,120,120"). None = not set,
+    # so the planner never flags a day as overloaded.
+    weekday_minutes: Mapped[str | None] = mapped_column(String(40))
 
     user: Mapped[User] = relationship(back_populates="settings")
 

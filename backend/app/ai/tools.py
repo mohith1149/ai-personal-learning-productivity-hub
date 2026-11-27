@@ -153,6 +153,10 @@ def _weekly_report(db, user, a: WeekOf):
             "per_day": [{k: d[k] for k in keep} for d in r["days"]], "projects": r["projects"], "habits": r["habits"]}
 
 
+def _slipping(db, user, a: NoArgs):
+    return {"slipping_tasks": planner.slipping_tasks(db, user), "moved_times_that_counts_as_slipping": planner.SLIP_AT}
+
+
 def github_client() -> gh.GitHubClient:
     """A function so tests can swap in a fake. Public repos need no token; GITHUB_TOKEN (backend only) adds private ones."""
     return gh.GitHubClient(get_settings().github_token or None)
@@ -211,6 +215,7 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("get_habit_status", "Habits with today's status and streaks.", "read", NoArgs, _habits),
     Tool("get_challenge_status", "Today's daily project challenge, streaks and missed days. Evidence is self-reported and unverified.", "read", NoArgs, _challenge),
     Tool("get_weekly_report", "A Monday-to-Sunday report: items finished, study and project minutes, habit check-ins, plan completion and the challenge, per day and in total, compared with the same days of the previous week.", "read", WeekOf, _weekly_report),
+    Tool("get_slipping_items", "Open tasks that keep being moved to another day (moved 3 or more times), with how often and what they were first planned for. Use it to ask why something keeps slipping.", "read", NoArgs, _slipping),
     Tool("look_up_github_repo", "Read a public GitHub repository (description, topics, languages, README start) from its link. Read-only.", "read", RepoLookup, _look_up_repo),
     Tool("create_task", "Propose a new task. The user must approve it before it is created.", "write", tks.TaskCreate, _create_task, _task_line),
     Tool("complete_task", "Propose marking a task completed. The user must approve it.", "write", CompleteTask, _complete_task, lambda a: f"Mark task #{a.task_id} as completed"),

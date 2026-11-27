@@ -116,7 +116,7 @@ def build(db: Session, user: User, start: date, end: date, kind: str, label: str
     series = _collect(db, user, start, end)
 
     ch = challenges.calendar(db, user, start, end, now)
-    ch_status = {x["date"]: x["status"] for x in ch["days"]}
+    ch_status = {x["date"]: ("excused" if x["status"] == "rest" else x["status"]) for x in ch["days"]}  # a rest day counts as excused here
     in_period = [d for d in ch["days"] if d["date"] <= today]
 
     days = []
@@ -162,7 +162,7 @@ def build(db: Session, user: User, start: date, end: date, kind: str, label: str
         "days": days, "totals": totals, "previous": previous,
         "plan": {"total": plan_total, "completed": plan_done, "percent": (100 * plan_done) // plan_total if plan_total else 0},
         "challenge": {"completed": sum(d["status"] == "completed" for d in in_period), "verified": verified, "missed": sum(d["status"] == "missed" for d in in_period),
-                      "excused": sum(d["status"] == "excused" for d in in_period), "current_streak": ch["stats"]["current_streak"]},
+                      "excused": sum(d["status"] in ("excused", "rest") for d in in_period), "current_streak": ch["stats"]["current_streak"]},
         "projects": [{"project_id": i, "title": t, "minutes": int(m)} for i, t, m in project_rows],
         "habits": [{"habit_id": i, "name": n, "done_days": int(c)} for i, n, c in habit_rows],
     }

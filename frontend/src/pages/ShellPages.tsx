@@ -2,13 +2,14 @@ import { Link } from "react-router-dom";
 import { useAuthStatus } from "../api/auth";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { EmailSettings } from "./settings/EmailSettings";
+import { PlanningSettings } from "./settings/PlanningSettings";
 import { Button, Card, EmptyState, PageHeader } from "../components/ui";
 
 export function SettingsPage() {
   const user = useAuthStatus().data?.user;
   return (
     <>
-      <PageHeader title="Settings" description="Your account, e-mail reminders and appearance." />
+      <PageHeader title="Settings" description="Your account, planning, e-mail reminders and appearance." />
       <div className="grid max-w-2xl gap-5">
         <Card>
           <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">Account</h2>
@@ -24,6 +25,7 @@ export function SettingsPage() {
             Editing your profile and timezone arrives with a later milestone.
           </p>
         </Card>
+        <PlanningSettings />
         <EmailSettings />
         <Card>
           <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">Appearance</h2>

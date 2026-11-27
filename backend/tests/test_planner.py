@@ -85,7 +85,8 @@ def test_an_empty_account_has_an_empty_plan(db, user):
     p = plan(db, user)
     assert p["items"] == [] and p["is_today"] is True and p["date"] == TODAY
     assert p["summary"] == {"total": 0, "completed": 0, "pending": 0, "overdue": 0, "excused": 0, "percent": 0,
-                            "study_minutes": 0, "dev_minutes": 0, "by_kind": []}
+                            "study_minutes": 0, "dev_minutes": 0, "by_kind": [], "rest_day": False, "planned_minutes": 0,
+                            "available_minutes": None, "unestimated": 0, "overloaded": False}
 
 
 def test_is_today_flag(db, user):

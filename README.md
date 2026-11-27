@@ -25,7 +25,7 @@ a combined daily planner, a daily AI project challenge, a dashboard, weekly and 
 | Page | What it does |
 |---|---|
 | Dashboard | Today at a glance: plan, tasks, videos to watch, habits, projects, challenge, roadmap, last 7 days. Computed from the other pages, nothing stored. |
-| Daily planner | One list for the day from tasks, course lessons, videos, roadmap topic, habits and projects. Complete, reschedule or excuse items. |
+| Daily planner | One list for the day from tasks, course lessons, videos, roadmap topic, habits and projects. Complete, reschedule or excuse items. **Rest days:** a limited number per month (default 4) so a sick day or a holiday keeps your challenge streak and shows nothing as overdue. **Daily hours:** set the hours you have each weekday in Settings and the planner flags a day that has more planned than that (only items with a time are added up; the rest are counted, not guessed). **Move unfinished to tomorrow** previews and moves open tasks and shows how loaded tomorrow becomes. A task moved 3 or more times is marked *Slipping*, with a button that asks the assistant why. |
 | Tasks | Priorities, categories, due dates, recurring tasks. |
 | Courses | Courses, modules, lessons, study sessions. |
 | Videos | Collections with a daily target; paste links or import a YouTube playlist. Finished videos are never suggested again. |
@@ -34,8 +34,8 @@ a combined daily planner, a daily AI project challenge, a dashboard, weekly and 
 | Projects | Projects, milestones, development sessions. **Suggest with AI** (when a key is set) fills the empty fields and proposes milestones from a repo link and/or your description; you edit before creating. **Fill from GitHub** reads a repo (name, description or README intro, languages, topics) and fills the empty form fields; nothing is saved until you click Create. |
 | Daily challenge | One real piece of AI project work per day: a summary, repo URL, commit hash and minutes, or an explicit excuse. A day is never completed automatically. Streaks and missed days are computed, never stored. **Verify on GitHub** checks the commit exists, matches your message, was made that day and changes code; only a pass shows *Verified*. Public repos need no setup; set `GITHUB_TOKEN` in `backend/.env` for private repos. |
 | Reports | **Weekly and monthly reports** from your own records: items finished, study and project time, habit check-ins, plan completion and the daily challenge, per day and in total, compared with the same days of the previous period. Charts have a table view. Nothing is estimated; days that have not happened yet are blank. |
-| Settings | Your account (read-only), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
-| AI assistant | Chat window (shown once a key is set) with a **model menu**, 17 tools (12 read, 5 propose-only; includes a weekly report), **Morning check-in / Evening check-out** buttons, a GitHub repo lookup (paste a repo link in the chat), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
+| Settings | Your account (read-only), **planning** (hours per weekday, rest days per month), **e-mail reminders** (daily plan, evening overdue nudge, weekly report; times, test e-mail, history) and a light/dark switch. Editing your profile or timezone is not built. |
+| AI assistant | Chat window (shown once a key is set) with a **model menu**, 18 tools (13 read, 5 propose-only; includes a weekly report and slipping tasks), **Morning check-in / Evening check-out** buttons, a GitHub repo lookup (paste a repo link in the chat), approval queue and a **Test the connection** button. The assistant cannot change anything itself. |
 
 ## Run it (Windows, development)
 

@@ -45,7 +45,7 @@ def test_every_endpoint_requires_login(client, method, path):
 def test_today_when_nothing_is_planned(c):
     r = c.get("/api/challenges/today").json()
     assert r["date"] == TODAY.isoformat() and r["challenge"] is None and r["suggestions"] == []
-    assert r["stats"] == {"completed": 0, "excused": 0, "missed": 0, "completion_rate": 0, "current_streak": 0, "longest_streak": 0,
+    assert r["stats"] == {"completed": 0, "excused": 0, "rest_days": 0, "missed": 0, "completion_rate": 0, "current_streak": 0, "longest_streak": 0,
                           "total_minutes": 0, "first_day": None}
 
 

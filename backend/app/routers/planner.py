@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.deps import CurrentUser, DbSession
 from app.schemas import planner as s
 from app.services import planner as svc
+from app.services import prefs
 
 router = APIRouter(prefix="/planner", tags=["planner"])
 
@@ -58,3 +59,32 @@ def excuse(body: s.ExcuseIn, user: CurrentUser, db: DbSession):
 @router.post("/unexcuse", response_model=s.DayPlan)
 def unexcuse(body: s.ItemRef, user: CurrentUser, db: DbSession):
     return _run(svc.remove_excuse, db, user, body)
+
+
+@router.post("/roll-over", response_model=s.RollOverOut)
+def roll_over(body: s.RollOverIn, user: CurrentUser, db: DbSession):
+    """Move today's unfinished tasks to tomorrow. `dry_run` previews it and saves nothing."""
+    return _run(svc.roll_over, db, user, body)
+
+
+def _prefs_out(db, user) -> dict:
+    return {"weekday_minutes": prefs.weekday_minutes(db, user), "rest_days_per_month": prefs.settings_row(db, user).rest_days_per_month}
+
+
+@router.get("/preferences", response_model=s.Preferences)
+def get_preferences(user: CurrentUser, db: DbSession):
+    out = _prefs_out(db, user)
+    db.commit()
+    return out
+
+
+@router.patch("/preferences", response_model=s.Preferences)
+def update_preferences(body: s.PreferencesIn, user: CurrentUser, db: DbSession):
+    row = prefs.settings_row(db, user)
+    data = body.model_dump(exclude_unset=True)
+    if "weekday_minutes" in data:
+        row.weekday_minutes = prefs.encode(data["weekday_minutes"])
+    if data.get("rest_days_per_month") is not None:
+        row.rest_days_per_month = data["rest_days_per_month"]
+    db.commit()
+    return _prefs_out(db, user)

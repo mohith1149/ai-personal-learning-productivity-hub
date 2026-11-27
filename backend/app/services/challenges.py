@@ -23,7 +23,7 @@ from app.core.timeutil import user_today
 from app.models import Course, DailyChallenge, Project, ProjectMilestone, RoadmapStage, RoadmapTopic, Task, User
 from app.schemas import challenges as s
 from app.schemas import projects as ps
-from app.services import courses, projects
+from app.services import courses, projects, rest
 
 
 class NotFound(Exception):
@@ -137,12 +137,13 @@ def stats(db: Session, user: User, now: datetime | None = None) -> dict:
     first = min((r.date for r in rows), default=None)
     completed = {r.date for r in rows if r.status == "completed"}
     excused = {r.date for r in rows if r.status == "excused"}
+    rest_days = {d for d in rest.all_days(db, user) if d <= today}  # planned rest days behave like excused days
     # missed = every day from the first record up to yesterday that is neither completed nor excused
     span = (today - first).days if first and first < today else 0
-    missed = sum(1 for i in range(span) if (first + timedelta(days=i)) not in completed | excused)
-    current, longest = streaks(completed, excused, today)
+    missed = sum(1 for i in range(span) if (first + timedelta(days=i)) not in completed | excused | rest_days)
+    current, longest = streaks(completed, excused | rest_days, today)
     return {
-        "completed": len(completed), "excused": len(excused), "missed": missed,
+        "completed": len(completed), "excused": len(excused), "rest_days": len(rest_days), "missed": missed,
         "completion_rate": (100 * len(completed)) // (len(completed) + missed) if completed or missed else 0,
         "current_streak": current, "longest_streak": longest,
         "total_minutes": sum(r.actual_minutes or 0 for r in rows if r.status == "completed"), "first_day": first,
@@ -204,7 +205,7 @@ def suggestions(db: Session, user: User, now: datetime | None = None) -> list[di
 def today_view(db: Session, user: User, now: datetime | None = None) -> dict:
     today = user_today(user, now)
     c = _on(db, user, today)
-    return {"date": today, "challenge": _out(c, today) if c else None, "stats": stats(db, user, now),
+    return {"date": today, "rest_day": today in rest.all_days(db, user), "challenge": _out(c, today) if c else None, "stats": stats(db, user, now),
             "suggestions": [] if c and c.status in ("completed", "excused") else suggestions(db, user, now)}
 
 
@@ -227,11 +228,16 @@ def calendar(db: Session, user: User, start: date, end: date, now: datetime | No
     first = db.scalar(select(func.min(DailyChallenge.date)).where(DailyChallenge.user_id == user.id))
     rows = {c.date: c for c in db.scalars(select(DailyChallenge).where(DailyChallenge.user_id == user.id, DailyChallenge.date >= start,
                                                                        DailyChallenge.date <= end))}
+    rest_days = rest.set_of(db, user, start, end)
     days, d = [], start
     while d <= end:
         c = rows.get(d)
         if c:
             status, title, cid = _effective(c, today), (c.project.title if c.project else None), c.id
+            if status == "missed" and d in rest_days:
+                status = "rest"
+        elif d in rest_days:
+            status, title, cid = "rest", None, None
         elif first and first <= d < today:
             status, title, cid = "missed", None, None
         else:

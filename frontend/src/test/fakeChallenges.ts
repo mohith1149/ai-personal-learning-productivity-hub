@@ -26,7 +26,7 @@ export function installFakeChallenges(fake: Fake, seed: Partial<FakeChallenges> 
   const stats = (): Stats => {
     const done = store.challenges.filter((c) => c.status === "completed");
     return {
-      completed: done.length, excused: store.challenges.filter((c) => c.status === "excused").length, missed: 0, completion_rate: done.length ? 100 : 0,
+      completed: done.length, excused: store.challenges.filter((c) => c.status === "excused").length, rest_days: 0, missed: 0, completion_rate: done.length ? 100 : 0,
       current_streak: done.length, longest_streak: done.length, total_minutes: done.reduce((n, c) => n + (c.actual_minutes ?? 0), 0),
       first_day: store.challenges.map((c) => c.date).sort()[0] ?? null, ...store.stats,
     };
@@ -36,13 +36,13 @@ export function installFakeChallenges(fake: Fake, seed: Partial<FakeChallenges> 
   const handler: Handler = ({ method, path, body }) => {
     if (path === "/api/challenges/today" && method === "GET") {
       const c = onDay(today());
-      return json({ date: today(), challenge: c ?? null, stats: stats(), suggestions: c && (c.status === "completed" || c.status === "excused") ? [] : store.suggestions });
+      return json({ date: today(), rest_day: fake.planning.restDays.some((r) => r.date === today()), challenge: c ?? null, stats: stats(), suggestions: c && (c.status === "completed" || c.status === "excused") ? [] : store.suggestions });
     }
     if (path === "/api/challenges/calendar" && method === "GET") {
       const days: CalendarDay[] = Array.from({ length: 30 }, (_, i) => {
         const date = addDays(today(), i - 29);
         const c = onDay(date);
-        return { date, status: c?.status ?? "none", project_title: c?.project?.title ?? null, challenge_id: c?.id ?? null };
+        return { date, status: c?.status ?? (fake.planning.restDays.some((r) => r.date === date) ? ("rest" as const) : "none"), project_title: c?.project?.title ?? null, challenge_id: c?.id ?? null };
       });
       return json({ start: days[0].date, end: days[29].date, days, stats: stats() });
     }
