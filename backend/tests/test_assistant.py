@@ -60,7 +60,7 @@ def test_the_tool_set_is_exactly_what_the_design_allows():
     reads = {n for n, t in tools.TOOLS.items() if t.kind == "read"}
     writes = {n for n, t in tools.TOOLS.items() if t.kind == "write"}
     assert reads == {"get_today_tasks", "get_pending_tasks", "get_plan", "get_dashboard", "get_course_progress", "get_next_video", "get_active_projects",
-                     "get_roadmap_progress", "get_habit_status", "get_challenge_status", "look_up_github_repo", "get_weekly_report", "get_slipping_items"}
+                     "get_roadmap_progress", "get_habit_status", "get_challenge_status", "look_up_github_repo", "get_weekly_report", "get_slipping_items", "get_goals"}
     assert writes == {"create_task", "complete_task", "reschedule_task", "record_project_progress", "create_project_challenge"}
     assert "complete_challenge" not in tools.TOOLS          # evidence must come from the user, never the model
 

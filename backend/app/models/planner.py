@@ -1,9 +1,9 @@
-from datetime import date as DateT
+from datetime import date as DateT, datetime as DateTime
 
 from sqlalchemy import CheckConstraint, Date, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.base import IdMixin, OwnedMixin, TimestampMixin, in_values
 
 PLANNER_KINDS = ("task", "lesson", "video", "topic", "habit", "project")
@@ -35,3 +35,26 @@ class RestDay(IdMixin, OwnedMixin, TimestampMixin, Base):
 
     date: Mapped[DateT] = mapped_column(Date, nullable=False)
     reason: Mapped[str | None] = mapped_column(String(200))
+
+
+TIMER_KINDS = ("task", "lesson", "topic", "project", "course")
+
+
+class ActiveTimer(IdMixin, OwnedMixin, TimestampMixin, Base):
+    """The one running stopwatch a user can have. Stopping it logs the elapsed minutes as a session on the project / course / topic
+    it was started on (and adds them to a task's actual minutes); discarding it logs nothing. Nothing is logged while it runs."""
+
+    __tablename__ = "active_timers"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_active_timers_user"),
+        CheckConstraint(in_values("kind", TIMER_KINDS), name="kind"),
+    )
+
+    started_at: Mapped[DateTime] = mapped_column(UTCDateTime, nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    label: Mapped[str] = mapped_column(String(300), nullable=False)
+    task_id: Mapped[int | None] = mapped_column(Integer)
+    lesson_id: Mapped[int | None] = mapped_column(Integer)
+    topic_id: Mapped[int | None] = mapped_column(Integer)
+    course_id: Mapped[int | None] = mapped_column(Integer)
+    project_id: Mapped[int | None] = mapped_column(Integer)

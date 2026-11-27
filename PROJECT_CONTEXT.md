@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4 to 9 complete. Phase 9 (sustainable pace) added rest days, daily hours with overload flag, roll-over and slipping tasks.
+Last updated: 2026-11-25 — Phases 4 to 10 complete. Phase 10 added goals with a pace warning and a timer that logs time. (Phase 9: rest days, daily hours with overload flag, roll-over, slipping tasks.)
 ---
 
 ## 1. Purpose
@@ -663,3 +663,26 @@ time, a shareable progress page and weekly e-mail, containers).
   it, or drop it, each needing approval). The planner links to `/assistant?ask=...`, which pre-fills the chat box without sending.
 - Migration `7695ccbb61ae` adds `rest_days` and the two settings columns. Tests: `tests/test_phase9.py`, `tests/test_phase9_api.py`,
   `src/test/phase9.test.tsx`.
+
+
+---
+
+## Phase 10: goals with a pace warning, and the timer
+
+Reviewer items 4 and 7. Phase 11 (shareable progress page and weekly e-mail, container, portfolio page) is still to do.
+
+- **Goals** (`services/goals.py`, `GET /api/goals`, nothing new stored): an active course or project with a `target_date` is a goal. Pace comes
+  from what was really finished: remaining = lessons not completed (course) or milestones plus non-cancelled tasks not done (project); days left =
+  today to the target, both included, minus planned rest days; needed = remaining / days left; your pace = items finished in the last 14 local days / 14;
+  projected finish = today + remaining / pace. Status: `done`, `overdue`, `behind` (projected after the target), `stalled` (finished things before,
+  none in 14 days), `not_started` (warns only if it already needs at least one item a day), `on_track`, `unknown` (nothing to count: no projection is
+  invented). `warning` is true for overdue, behind, stalled and a hurried not_started. The server writes the `message`, so the UI and the assistant say
+  the same thing. UI: a "Goals and pace" card on today's planner and a pace line on the course and project pages. New read tool `get_goals` (tool 19) and
+  a prompt rule (at most one suggested change; the user moves the date themselves).
+- **Timer** (`active_timers`, one row per user, `services/timer.py`, `/api/timer`): start on a task, lesson, course, roadmap topic or project; one at a
+  time (409 otherwise). It survives a reload because it is stored. Nothing is logged while it runs. Stop logs the minutes (rounded, at least 1; the
+  user may correct them; past 24 hours they must) as a development session on the project (a project task logs to its project with the task attached),
+  else a study session on the course/lesson or the roadmap topic; a task's `actual_minutes` also grows. Discard logs nothing. The delete of the timer and
+  the log share one transaction, so a failure keeps the timer and a success never logs twice. UI: a bar under the header on every page (clock counts from
+  the server's elapsed figure, so a wrong local clock is harmless) and "Timer" buttons on planner rows, tasks, lessons, courses, topics and projects.
+- Migration `8c8a6ae3b160` adds `active_timers`. Tests: `tests/test_phase10.py`, `tests/test_phase10_api.py`, `src/test/phase10.test.tsx`.
