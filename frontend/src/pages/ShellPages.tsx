@@ -3,6 +3,7 @@ import { useAuthStatus } from "../api/auth";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { EmailSettings } from "./settings/EmailSettings";
 import { PlanningSettings } from "./settings/PlanningSettings";
+import { ShareSettings } from "./settings/ShareSettings";
 import { Button, Card, EmptyState, PageHeader } from "../components/ui";
 
 export function SettingsPage() {
@@ -27,6 +28,7 @@ export function SettingsPage() {
         </Card>
         <PlanningSettings />
         <EmailSettings />
+        <ShareSettings />
         <Card>
           <h2 className="mb-1 text-sm font-semibold text-slate-900 dark:text-white">Appearance</h2>
           <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">

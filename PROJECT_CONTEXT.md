@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4 to 10 complete. Phase 10 added goals with a pace warning and a timer that logs time. (Phase 9: rest days, daily hours with overload flag, roll-over, slipping tasks.)
+Last updated: 2026-11-25 — Phases 4 to 11 complete. Phase 11 added a private share page and containers. Phase 10 added goals with a pace warning and a timer that logs time. (Phase 9: rest days, daily hours with overload flag, roll-over, slipping tasks.)
 ---
 
 ## 1. Purpose
@@ -686,3 +686,23 @@ Reviewer items 4 and 7. Phase 11 (shareable progress page and weekly e-mail, con
   the log share one transaction, so a failure keeps the timer and a success never logs twice. UI: a bar under the header on every page (clock counts from
   the server's elapsed figure, so a wrong local clock is harmless) and "Timer" buttons on planner rows, tasks, lessons, courses, topics and projects.
 - Migration `8c8a6ae3b160` adds `active_timers`. Tests: `tests/test_phase10.py`, `tests/test_phase10_api.py`, `src/test/phase10.test.tsx`.
+
+
+---
+
+## Phase 11: share page, portfolio and containers
+
+Reviewer items 1, 3 and 5 (item 8, peak focus hours, is still open: it needs a way to mark topics hard or light and your best hours).
+
+- **Share link** (`user_settings.share_token`, `routers/share.py`): `GET/POST/DELETE /api/share` (login) turn sharing on, replace the link or turn it
+  off; a new token kills the old link at once. The public page is `GET /share/<token>` (outside `/api`, plain HTML from `services/portfolio.py`; no
+  scripts, a strict CSP, `noindex`, `no-store`, no referrer). A wrong, short or revoked token gives the same 404. It doubles as the portfolio page
+  (item 5): streaks, hours studied and built, **verified** challenge commits only (first line of the message, short hash, date; latest 60), projects with
+  technologies, completed topics and courses. Never: tasks, habits, notes, write-ups, e-mail, unverified commits, private repository names/links. A
+  project is linked only when tied to a repository record that is known to be public (a typed-in URL could be private); only https links are made clickable.
+- **Weekly e-mail** (item 3) already existed (`weekly_report`, with a test-send); it now includes the share link while sharing is on.
+- **Containers** (item 1): `backend/Dockerfile` (python 3.11-slim, non-root, `/data` volume, migrates then serves, health check), `frontend/Dockerfile`
+  (node build, nginx), `frontend/nginx.conf` (forwards `/api` and `/share`, SPA fallback), `docker-compose.yml` (volume `hub-data`, port 8080, env
+  overrides for the database path and public URL). **Not built or run on the author's machine: no `docker` command was available while writing it.**
+- Vite dev proxy forwards `/share` too. Migration `dcf3313dd4c4` adds `user_settings.share_token` (unique). Tests: `tests/test_phase11.py` (16),
+  `src/test/phase11.test.tsx` (6).

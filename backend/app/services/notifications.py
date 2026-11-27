@@ -102,7 +102,14 @@ def render(db: Session, user: User, kind: str, now: datetime | None, frontend_ur
                 f"<p><b>{done}</b> of <b>{tot}</b> planned items completed ({pct}%).</p>"
                 f"<table cellpadding='4'><tr><th align=left>Day</th><th>Done</th><th>%</th></tr>{rows}</table>"
                 f"<p><b>Daily challenge:</b> {c_done} completed, {c_missed} missed. Current streak {streak} day(s).</p>")
-        text = f"Week {start.isoformat()} to {today.isoformat()}: {done}/{tot} items ({pct}%). Challenge: {c_done} done, {c_missed} missed, streak {streak}."
+        token = prefs.settings_row(db, user).share_token
+        if token:
+            link = f"{frontend_url.rstrip('/')}/share/{token}"
+            body += f'<p>Your shareable progress page: <a href="{escape(link, quote=True)}">{escape(link)}</a></p>'
+            text_link = f"\nYour shareable progress page: {link}"
+        else:
+            text_link = ""
+        text = f"Week {start.isoformat()} to {today.isoformat()}: {done}/{tot} items ({pct}%). Challenge: {c_done} done, {c_missed} missed, streak {streak}." + text_link
         return {"subject": f"Your week: {done}/{tot} done, challenge streak {streak}", "html": _wrap("Your weekly report", body, frontend_url), "text": text}
     raise RuleError("Unknown e-mail type")
 

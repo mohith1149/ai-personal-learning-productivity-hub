@@ -7,8 +7,11 @@ a small VPS) and keeping its data safe. It has not been load-tested because it d
 
 - The **backend** (FastAPI) serves only `/api/...`. It does not serve the web app.
 - The **frontend** builds to static files in `frontend/dist`. Any web server can serve them.
-- A **reverse proxy** puts both on **one public address**: static files for `/`, and `/api` forwarded to the backend. Same origin is
-  what lets the session cookie work without cross-site settings.
+- A **reverse proxy** puts both on **one public address**: static files for `/`, and `/api` and `/share` forwarded to the backend. Same
+  origin is what lets the session cookie work without cross-site settings. (`/share/<token>` is the public progress page; if you skip it
+  in the proxy, share links will show the app's "page not found" instead.)
+
+Prefer containers? Jump to [Containers](#containers-docker-or-rancher-desktop): the repo has a ready `docker-compose.yml`.
 
 ## 1. Build the frontend
 
@@ -60,6 +63,9 @@ hub.example.com {
     handle /api/* {
         reverse_proxy 127.0.0.1:8000
     }
+    handle /share/* {
+        reverse_proxy 127.0.0.1:8000
+    }
     handle {
         root * C:/path/to/ai-learning-hub/frontend/dist
         try_files {path} /index.html
@@ -69,7 +75,7 @@ hub.example.com {
 ```
 
 `try_files ... /index.html` matters: the app uses client-side routes such as `/reports`, which must load the app, not a 404.
-nginx is equivalent: `location /api/ { proxy_pass http://127.0.0.1:8000; }` plus `try_files $uri /index.html;` for the rest.
+nginx is equivalent: `location /api/ { proxy_pass http://127.0.0.1:8000; }` and the same for `/share/`, plus `try_files $uri /index.html;` for the rest.
 
 If the machine is reachable from the internet, remember the app has one login and nothing else in front of it. Put it behind a VPN
 (Tailscale, WireGuard) or an access proxy if you can, use a long password, and keep the box patched.
@@ -79,6 +85,32 @@ If the machine is reachable from the internet, remember the app has one login an
 1. `https://hub.example.com/api/health` shows `{"status":"ok","database":"ok",...}`.
 2. Sign in, reload the page (still signed in), open **Reports**.
 3. Settings → **Send a test e-mail**, and AI assistant → **Test the connection**, if you use them.
+
+## Containers (Docker or Rancher Desktop)
+
+`docker-compose.yml` runs two containers: **backend** (FastAPI + the database, built from `backend/Dockerfile`) and **frontend** (nginx
+serving the built app and forwarding `/api` and `/share` to the backend, built from `frontend/Dockerfile`). You only see one address.
+
+1. Install Rancher Desktop and, in its settings, choose the **dockerd (moby)** container engine (so the `docker` command exists), or install Docker Desktop.
+2. Copy `backend/.env.example` to `backend/.env` and fill it in. `SECRET_KEY` (32+ characters) is required; add your AI, GitHub, YouTube and SMTP keys as usual.
+   `docker-compose.yml` overrides the settings that must differ in a container (database location, public address, production mode), so you can leave those out.
+3. From the project folder: `docker compose up --build -d`, then open <http://localhost:8080> and create your account.
+4. Useful: `docker compose logs -f backend`, `docker compose ps` (the backend shows "healthy"), `docker compose down` (stops; data is kept).
+
+Choices you can change with environment variables (or a `.env` file next to `docker-compose.yml`):
+
+| Variable | Default | Use |
+|---|---|---|
+| `HUB_PORT` | `8080` | Port on this computer |
+| `PUBLIC_URL` | `http://localhost:8080` | The address you type in the browser. Used for the allowed origin and links in e-mails and share links |
+| `COOKIE_SECURE` | `false` | Set `true` when you serve it over https (behind a TLS proxy) |
+
+- **Your data** is in the Docker volume `hub-data` (`/data/hub.db` inside the backend). It survives `down`, rebuilds and upgrades. `docker compose down -v` **deletes it**.
+- **Upgrading**: `git pull`, then `docker compose up --build -d`. The backend runs the database migrations on start and refuses to start if one fails.
+- **Backup** (safe while running): `docker compose exec backend python -c "import sqlite3; s=sqlite3.connect('/data/hub.db'); d=sqlite3.connect('/data/backup.db'); s.backup(d)"` then `docker compose cp backend:/data/backup.db ./hub-backup.db`.
+- **Moving your existing data in**: stop the app, make a backup of `backend/data/hub.db` as described below, start the containers once, then `docker compose cp ./hub-backup.db backend:/data/hub.db` and `docker compose restart backend`.
+- Run **one** backend container. The built-in reminder scheduler would send every e-mail twice if you scaled it up.
+- The images were written for Linux containers and checked by reading, not yet by a build on the author's machine. If a build step fails, the error text is the thing to look at first; see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Backups
 
