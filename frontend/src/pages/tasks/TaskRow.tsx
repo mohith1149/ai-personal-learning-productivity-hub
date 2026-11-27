@@ -1,5 +1,6 @@
 import { Check, Clock, Pencil, Repeat, Trash2 } from "lucide-react";
 import type { Task } from "../../api/tasks";
+import { StartTimerButton } from "../../components/Timer";
 import { Badge, StatusBadge, cx } from "../../components/ui";
 import { describeDue } from "../../lib/dates";
 import { priorityLabel } from "./constants";
@@ -47,6 +48,7 @@ export function TaskRow({
       </button>
 
       <div className="min-w-0 flex-1">
+        {!closed && <StartTimerButton kind="task" id={task.id} label={task.title} className="py-1" />}
         <button
           onClick={() => onEdit(task)}
           className={cx(

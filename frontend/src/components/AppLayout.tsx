@@ -1,5 +1,6 @@
 import { LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TimerBar } from "./Timer";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuthStatus, useLogout } from "../api/auth";
 import { NAV_GROUPS, SETTINGS_ITEM, type NavItem } from "../nav";
@@ -156,6 +157,7 @@ export function AppLayout() {
             </button>
           </div>
         </header>
+        <TimerBar />
 
         <main id="main" className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:py-8">

@@ -1,10 +1,20 @@
 /** Rest days and planning preferences for the fake API (installed by default, like notifications). Real rules are tested in pytest. */
+import type { Goal } from "../api/goals";
 import type { Preferences, RestMonth } from "../api/planner";
+import type { Logged, RunningTimer } from "../api/timer";
 import type { Handler } from "./fakeApi";
 
-export type FakePlanning = { prefs: Preferences; restDays: { date: string; reason: string | null }[]; today: () => string };
+export type FakePlanning = {
+  prefs: Preferences;
+  restDays: { date: string; reason: string | null }[];
+  today: () => string;
+  goals: Goal[];
+  timer: RunningTimer | null;
+  /** What the fake logs when a timer is stopped (minutes come from the request). */
+  stopped: Logged[];
+};
 
-export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, rest_days_per_month: 4 }, restDays: [], today });
+export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, rest_days_per_month: 4 }, restDays: [], today, goals: [], timer: null, stopped: [] });
 
 export function restMonth(store: FakePlanning, month: string): RestMonth {
   const days = store.restDays.filter((d) => d.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));
@@ -32,6 +42,36 @@ export function planningHandler(store: FakePlanning): Handler {
     if (path === "/api/planner/preferences" && method === "PATCH") {
       Object.assign(store.prefs, body);
       return Response.json(store.prefs);
+    }
+    if (path === "/api/goals" && method === "GET") return Response.json(store.goals);
+    if (path === "/api/timer" && method === "GET") return Response.json(store.timer);
+    if (path === "/api/timer" && method === "DELETE") {
+      if (!store.timer) return Response.json({ detail: "No timer is running" }, { status: 404 });
+      store.timer = null;
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/api/timer/start" && method === "POST") {
+      if (store.timer) return Response.json({ detail: "A timer is already running. Stop it (to log the time) or discard it first" }, { status: 409 });
+      const b = body as { kind: RunningTimer["kind"]; ref_id: number };
+      store.timer = {
+        kind: b.kind, label: `Timed ${b.kind} ${b.ref_id}`, started_at: new Date().toISOString(), elapsed_seconds: 0, logs_to: b.kind === "project" ? "Project: Timed" : null,
+        task_id: b.kind === "task" ? b.ref_id : null, lesson_id: b.kind === "lesson" ? b.ref_id : null, topic_id: b.kind === "topic" ? b.ref_id : null,
+        course_id: b.kind === "course" ? b.ref_id : null, project_id: b.kind === "project" ? b.ref_id : null,
+      };
+      return Response.json(store.timer, { status: 201 });
+    }
+    if (path === "/api/timer/stop" && method === "POST") {
+      if (!store.timer) return Response.json({ detail: "No timer is running" }, { status: 404 });
+      const b = body as { minutes?: number; summary?: string };
+      const t = store.timer;
+      const logged: Logged = {
+        minutes: b.minutes ?? Math.max(1, Math.round(t.elapsed_seconds / 60)),
+        logged_to: t.project_id ? "project" : t.course_id ? "course" : t.topic_id ? "topic" : "task",
+        target_id: t.project_id ?? t.course_id ?? t.topic_id, label: t.label, date: store.today(),
+      };
+      store.stopped.push(logged);
+      store.timer = null;
+      return Response.json(logged);
     }
     return undefined;
   };

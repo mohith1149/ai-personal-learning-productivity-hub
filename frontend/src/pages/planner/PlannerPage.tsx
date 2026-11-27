@@ -15,6 +15,8 @@ import {
   type PlanItem,
 } from "../../api/planner";
 import { FormError, TextArea, TextInput } from "../../components/forms";
+import { GoalsCard } from "../../components/Goals";
+import { StartTimerButton } from "../../components/Timer";
 import { Modal } from "../../components/Modal";
 import { Badge, Button, Card, EmptyState, ErrorNotice, PageHeader, ProgressBar, Spinner, cx } from "../../components/ui";
 import { LoadNotice, RestDayCard, RollOverButton, formatMinutes } from "./PlanningPanel";
@@ -156,6 +158,9 @@ function ItemRow({ item, day, today, restDay }: { item: PlanItem; day: string; t
               Log a session
             </Link>
           )}
+          {!done && item.status !== "excused" && (item.kind === "task" || item.kind === "lesson" || item.kind === "topic" || item.kind === "project") && (
+            <StartTimerButton kind={item.kind} id={item.ref_id} label={item.title} />
+          )}
           {item.can_complete && !done && (
             <Button icon={Check} loading={complete.isPending} onClick={() => complete.mutate(ref)} aria-label={`Complete ${item.title}`} className="px-2.5 py-1.5">
               Done
@@ -270,6 +275,7 @@ export function PlannerPage() {
           <RestDayCard plan={plan.data} day={current} today={today} />
           <LoadNotice plan={plan.data} />
           <RollOverButton plan={plan.data} day={current} today={today} />
+          {current === today && <GoalsCard />}
           {current > today && <p className="text-sm text-slate-500 dark:text-slate-400">Future days only show tasks scheduled for them. Lessons, videos and habits are suggested on the day itself.</p>}
           {plan.data.items.length === 0 ? (
             <EmptyState icon={CalendarClock} title="Nothing planned for this day">

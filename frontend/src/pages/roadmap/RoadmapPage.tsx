@@ -17,6 +17,7 @@ import {
 } from "../../api/roadmap";
 import { FormError, TextArea, TextInput, controlClass } from "../../components/forms";
 import { ConfirmDialog, Modal } from "../../components/Modal";
+import { StartTimerButton } from "../../components/Timer";
 import { Button, Card, ErrorNotice, PageHeader, ProgressBar, Spinner, cx } from "../../components/ui";
 import { formatDay, todayIn } from "../../lib/dates";
 
@@ -198,6 +199,7 @@ function TopicRow({ topic, today, timeZone }: { topic: Topic; today: string; tim
           ))}
         </select>
         <div className="flex items-center">
+          {!done && <StartTimerButton kind="topic" id={topic.id} label={topic.title} className="py-1" />}
           <button onClick={() => setStudy(true)} aria-label={`Log study time for ${topic.title}`} title="Log study time" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800">
             <Timer className="h-4 w-4" aria-hidden />
           </button>

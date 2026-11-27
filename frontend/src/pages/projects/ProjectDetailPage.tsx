@@ -20,6 +20,8 @@ import {
 } from "../../api/projects";
 import { FormError, SelectInput, TextArea, TextInput } from "../../components/forms";
 import { ConfirmDialog, Modal } from "../../components/Modal";
+import { GoalPace } from "../../components/Goals";
+import { StartTimerButton } from "../../components/Timer";
 import { Badge, Button, Card, EmptyState, ErrorNotice, ProgressBar, Spinner, cx } from "../../components/ui";
 import { formatDay, todayIn } from "../../lib/dates";
 import { ProjectForm } from "./ProjectForm";
@@ -335,6 +337,7 @@ export function ProjectDetailPage() {
                 </a>
               )}
             </p>
+            {p.target_date && p.status === "active" && <GoalPace kind="project" id={p.id} />}
             {p.tech_stack.length > 0 && (
               <ul aria-label="Technologies" className="mt-2 flex flex-wrap gap-1">
                 {p.tech_stack.map((t) => (
@@ -346,6 +349,7 @@ export function ProjectDetailPage() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-1">
+            {p.status === "active" && <StartTimerButton kind="project" id={p.id} label={p.title} className="border border-slate-300 dark:border-slate-700" />}
             {p.status !== "completed" ? (
               <Button icon={Check} loading={update.isPending} onClick={() => update.mutate({ id: p.id, body: { status: "completed" } })}>
                 Mark project completed

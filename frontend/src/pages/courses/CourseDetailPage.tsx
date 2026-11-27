@@ -17,6 +17,8 @@ import {
   type Module,
 } from "../../api/courses";
 import { ConfirmDialog } from "../../components/Modal";
+import { GoalPace } from "../../components/Goals";
+import { StartTimerButton } from "../../components/Timer";
 import { Badge, Button, Card, ErrorNotice, ProgressBar, Spinner, StatusBadge, cx } from "../../components/ui";
 import { formatDay, todayIn } from "../../lib/dates";
 import { CourseForm } from "./CourseForm";
@@ -125,8 +127,10 @@ export function CourseDetailPage() {
             )}
             {c.target_date && <span>Target: {formatDay(c.target_date, today)}</span>}
           </p>
+          {c.target_date && c.status === "active" && <GoalPace kind="course" id={c.id} />}
         </div>
         <div className="flex flex-wrap gap-2">
+          {c.status === "active" && <StartTimerButton kind="course" id={c.id} label={c.title} className="border border-slate-300 dark:border-slate-700" />}
           <Button variant="secondary" icon={Pencil} onClick={() => setEditingCourse(true)}>
             Edit
           </Button>
@@ -285,6 +289,7 @@ export function CourseDetailPage() {
                               {l.duration_minutes && <span>{l.duration_minutes} min</span>}
                             </div>
                           </div>
+                          {l.status !== "completed" && <StartTimerButton kind="lesson" id={l.id} label={l.title} className="py-1" />}
                           {l.status === "not_started" && (
                             <button
                               onClick={() => lessonAction.mutate({ id: l.id, action: "start" })}
