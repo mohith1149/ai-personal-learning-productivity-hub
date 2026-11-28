@@ -46,7 +46,7 @@ def test_rest_day_validation(c):
 
 
 def test_the_limit_is_changed_in_preferences_and_enforced(c):
-    assert c.get("/api/planner/preferences").json() == {"weekday_minutes": None, "rest_days_per_month": 4}
+    assert c.get("/api/planner/preferences").json() == {"weekday_minutes": None, "focus_windows": None, "rest_days_per_month": 4}
     assert c.patch("/api/planner/preferences", json={"rest_days_per_month": 0}).json()["rest_days_per_month"] == 0
     r = c.post("/api/rest-days", json={"date": day(1)})
     assert r.status_code == 422 and "rest days" in r.json()["detail"]

@@ -27,7 +27,7 @@ def test_get_roadmap_shape_and_seed(c):
     assert len(r["stages"]) == 5 and r["overall"]["total"] == 51 and r["overall"]["percent"] == 0
     assert r["next_topic"]["title"] == "Python"
     t = r["stages"][0]["topics"][0]
-    assert set(t) == {"id", "stage_id", "title", "description", "position", "status", "notes", "minutes_spent", "study_days",
+    assert set(t) == {"id", "stage_id", "title", "description", "position", "status", "difficulty", "notes", "minutes_spent", "study_days",
                       "last_studied_on", "completed_at"}
 
 

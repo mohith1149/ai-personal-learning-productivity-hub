@@ -4,6 +4,9 @@ import { api } from "./client";
 export type TopicStatus = "not_started" | "in_progress" | "completed";
 export const TOPIC_STATUS_LABEL: Record<TopicStatus, string> = { not_started: "Not started", in_progress: "In progress", completed: "Completed" };
 
+export type Difficulty = "hard" | "normal" | "light";
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = { hard: "Hard", normal: "Normal", light: "Light" };
+
 export type Topic = {
   id: number;
   stage_id: number;
@@ -11,6 +14,7 @@ export type Topic = {
   description: string | null;
   position: number;
   status: TopicStatus;
+  difficulty: Difficulty; // hard topics are planned for your focus hours; light ones suit a walk or the evening
   notes: string | null;
   minutes_spent: number; // from logged study sessions
   study_days: number;
@@ -50,10 +54,10 @@ function useInvalidating<TVars, TData>(fn: (v: TVars) => Promise<TData>) {
 export const useSetTopicStatus = () =>
   useInvalidating(({ id, status }: { id: number; status: TopicStatus }) => api<Topic>(`/roadmap/topics/${id}/status`, { method: "POST", body: { status } }));
 export const useUpdateTopic = () =>
-  useInvalidating(({ id, body }: { id: number; body: { title?: string; description?: string | null; notes?: string | null } }) =>
+  useInvalidating(({ id, body }: { id: number; body: { title?: string; description?: string | null; notes?: string | null; difficulty?: Difficulty } }) =>
     api<Topic>(`/roadmap/topics/${id}`, { method: "PATCH", body }));
 export const useAddTopic = () =>
-  useInvalidating((body: { stage_id: number; title: string; description?: string | null }) => api<Topic>("/roadmap/topics", { method: "POST", body }));
+  useInvalidating((body: { stage_id: number; title: string; description?: string | null; difficulty?: Difficulty }) => api<Topic>("/roadmap/topics", { method: "POST", body }));
 export const useDeleteTopic = () => useInvalidating((id: number) => api<void>(`/roadmap/topics/${id}`, { method: "DELETE" }));
 export const useLogStudy = () =>
   useInvalidating(({ topicId, body }: { topicId: number; body: { minutes: number; date?: string; notes?: string | null } }) =>

@@ -23,7 +23,7 @@ function busy(): Partial<Dashboard> {
   const base = emptyDashboard();
   return {
     plan: {
-      summary: { total: 5, completed: 2, pending: 2, overdue: 1, excused: 0, percent: 40, study_minutes: 30, dev_minutes: 90, by_kind: [], rest_day: false, planned_minutes: 0, available_minutes: null, unestimated: 0, overloaded: false },
+      summary: { total: 5, completed: 2, pending: 2, overdue: 1, excused: 0, percent: 40, study_minutes: 30, dev_minutes: 90, by_kind: [], rest_day: false, planned_minutes: 0, available_minutes: null, unestimated: 0, overloaded: false, focus_window: null },
       next_items: [mkItem({ kind: "task", ref_id: 1, title: "File taxes", status: "overdue", link: "/tasks" }), mkItem({ kind: "video", ref_id: 2, title: "How DNS works", link: "/videos" })],
       open_count: 3,
     },

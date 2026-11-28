@@ -8,6 +8,7 @@ from app.schemas.common import Strict
 from app.schemas.courses import Notes
 
 TopicStatus = Literal["not_started", "in_progress", "completed"]
+Difficulty = Literal["hard", "normal", "light"]
 Minutes = Annotated[int, Field(ge=1, le=1440)]
 
 
@@ -15,12 +16,14 @@ class TopicCreate(Strict):
     stage_id: int
     title: str = Field(min_length=1, max_length=200)
     description: Notes | None = None
+    difficulty: Difficulty = "normal"
 
 
 class TopicUpdate(Strict):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: Notes | None = None
     notes: Notes | None = None
+    difficulty: Difficulty | None = None
 
 
 class SetTopicStatus(Strict):
@@ -49,6 +52,7 @@ class TopicOut(BaseModel):
     description: str | None
     position: int
     status: str
+    difficulty: str = "normal"  # hard | normal | light
     notes: str | None
     minutes_spent: int  # sum of the logged study sessions
     study_days: int  # distinct days with a logged session

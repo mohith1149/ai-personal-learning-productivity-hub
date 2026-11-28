@@ -94,7 +94,7 @@ def _study_stats(db: Session, user: User) -> dict[int, tuple[int, int, object]]:
 def _topic_out(t: RoadmapTopic, stats: dict) -> dict:
     minutes, days, last = stats.get(t.id, (0, 0, None))
     return {"id": t.id, "stage_id": t.stage_id, "title": t.title, "description": t.description, "position": t.position,
-            "status": t.status, "notes": t.notes, "minutes_spent": minutes, "study_days": days, "last_studied_on": last,
+            "status": t.status, "difficulty": t.difficulty, "notes": t.notes, "minutes_spent": minutes, "study_days": days, "last_studied_on": last,
             "completed_at": t.completed_at}
 
 
@@ -145,7 +145,7 @@ def create_topic(db: Session, user: User, data: s.TopicCreate) -> dict:
     if _title_taken(db, stage.id, title):
         raise Conflict("That stage already has a topic with that name")
     top = db.scalar(select(func.max(RoadmapTopic.position)).where(RoadmapTopic.stage_id == stage.id)) or 0
-    t = RoadmapTopic(user_id=user.id, stage_id=stage.id, title=title, description=data.description, position=top + 1)
+    t = RoadmapTopic(user_id=user.id, stage_id=stage.id, title=title, description=data.description, difficulty=data.difficulty, position=top + 1)
     db.add(t)
     db.commit()
     return _topic_out(t, {})
@@ -160,6 +160,8 @@ def update_topic(db: Session, user: User, topic_id: int, data: s.TopicUpdate) ->
         changes["title"] = changes["title"].strip()
         if _title_taken(db, t.stage_id, changes["title"], except_id=t.id):
             raise Conflict("That stage already has a topic with that name")
+    if "difficulty" in changes and changes["difficulty"] is None:
+        raise RuleError("difficulty can't be empty")
     for field, value in changes.items():
         setattr(t, field, value)
     db.commit()

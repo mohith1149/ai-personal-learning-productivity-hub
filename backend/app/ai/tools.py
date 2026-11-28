@@ -103,7 +103,7 @@ def _pending_tasks(db, user, _):
 
 def _plan(db, user, a: OptionalDay):
     p = planner.build_day(db, user, a.day or user_today(user))
-    return {"date": p["date"], "summary": p["summary"], "items": _cap([{k: i[k] for k in ("kind", "title", "subtitle", "status", "due_date")} for i in p["items"]])}
+    return {"date": p["date"], "summary": p["summary"], "items": _cap([{k: i[k] for k in ("kind", "title", "subtitle", "status", "due_date", "difficulty", "hint")} for i in p["items"]])}
 
 
 def _dashboard(db, user, _):
@@ -210,7 +210,7 @@ def _task_line(a: tks.TaskCreate) -> str:
 TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("get_today_tasks", "Tasks scheduled or due today, plus overdue ones.", "read", NoArgs, _today_tasks),
     Tool("get_pending_tasks", "All open (not completed) tasks.", "read", NoArgs, _pending_tasks),
-    Tool("get_plan", "The daily plan for a day: tasks, lessons, videos, roadmap topics, habits and project work, with each item's status.", "read", OptionalDay, _plan),
+    Tool("get_plan", "The daily plan for a day: tasks, lessons, videos, roadmap topics, habits and project work, with each item's status. Roadmap topics carry their difficulty, and open items a hint on where they fit (hard topics in the day's focus hours, light ones on a walk or in the evening).", "read", OptionalDay, _plan),
     Tool("get_dashboard", "An overview of today: plan progress, videos to watch, challenge streak, habits, tasks, projects, courses, roadmap.", "read", NoArgs, _dashboard),
     Tool("get_course_progress", "Courses with lesson progress and the next lesson.", "read", NoArgs, _courses),
     Tool("get_next_video", "Video collections with a daily target: how many were watched today and which are next.", "read", NoArgs, _next_videos),

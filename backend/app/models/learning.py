@@ -11,6 +11,7 @@ COURSE_STATUSES = ("active", "paused", "completed", "archived")
 LESSON_TYPES = ("lesson", "video")
 LESSON_STATUSES = ("not_started", "in_progress", "completed")
 TOPIC_STATUSES = ("not_started", "in_progress", "completed")
+TOPIC_DIFFICULTIES = ("hard", "normal", "light")
 VIDEO_STATUSES = ("unwatched", "watching", "completed")
 PLAYLIST_KINDS = ("collection", "playlist", "channel")
 RECOMMEND_ORDERS = ("oldest", "newest", "manual")
@@ -110,6 +111,7 @@ class RoadmapTopic(IdMixin, OwnedMixin, TimestampMixin, Base):
     __tablename__ = "roadmap_topics"
     __table_args__ = (
         CheckConstraint(in_values("status", TOPIC_STATUSES), name="status"),
+        CheckConstraint(in_values("difficulty", TOPIC_DIFFICULTIES), name="difficulty"),
         CheckConstraint("completion_pct BETWEEN 0 AND 100", name="completion_pct"),
         # completed <=> completed_at is set: a topic is only ever completed by an explicit action
         CheckConstraint("(status = 'completed') = (completed_at IS NOT NULL)", name="completed_at_matches_status"),
@@ -124,6 +126,8 @@ class RoadmapTopic(IdMixin, OwnedMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="not_started", nullable=False)
+    # hard topics are planned for your best focus hours; light ones suit a walk or the evening (see services/focus.py)
+    difficulty: Mapped[str] = mapped_column(String(8), default="normal", server_default="normal", nullable=False)
     completion_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     exercises: Mapped[str | None] = mapped_column(Text)
     project_applications: Mapped[str | None] = mapped_column(Text)

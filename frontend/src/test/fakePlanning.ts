@@ -16,7 +16,7 @@ export type FakePlanning = {
   share: Share;
 };
 
-export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, rest_days_per_month: 4 }, restDays: [], today, goals: [], timer: null, stopped: [], share: { enabled: false, token: null, path: null } });
+export const newFakePlanning = (today: () => string): FakePlanning => ({ prefs: { weekday_minutes: null, focus_windows: null, rest_days_per_month: 4 }, restDays: [], today, goals: [], timer: null, stopped: [], share: { enabled: false, token: null, path: null } });
 
 export function restMonth(store: FakePlanning, month: string): RestMonth {
   const days = store.restDays.filter((d) => d.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date));

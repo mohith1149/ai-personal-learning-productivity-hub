@@ -135,6 +135,9 @@ function ItemRow({ item, day, today, restDay }: { item: PlanItem; day: string; t
             {item.due_date && <>{item.subtitle ? " · " : ""}due {formatDay(item.due_date, today)}</>}
             {item.minutes ? <>{item.subtitle || item.due_date ? " · " : ""}~{formatMinutes(item.minutes)}</> : null}
           </p>
+          {item.hint && (
+            <p className={cx("text-xs", item.difficulty === "hard" ? "font-medium text-brand-700 dark:text-brand-400" : "text-slate-500 dark:text-slate-400")}>{item.hint}</p>
+          )}
           {item.slipping && item.status !== "completed" && (
             <p className="text-xs text-amber-800 dark:text-amber-300">
               <Link

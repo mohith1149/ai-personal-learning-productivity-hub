@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import Strict
+from app.services import focus
 
 Kind = Literal["task", "lesson", "video", "topic", "habit", "project"]
 ItemStatus = Literal["pending", "overdue", "completed", "excused"]
@@ -43,6 +44,8 @@ class PlanItem(BaseModel):
     url: str | None  # external link (lesson / video), if any
     carry_count: int = 0  # how many times this task was moved to another day
     slipping: bool = False  # moved 3 or more times and still open
+    difficulty: str | None = None  # roadmap topics only: hard | normal | light
+    hint: str | None = None  # where this fits in your day (focus hours, or a light moment), for open items
 
 
 class KindCount(BaseModel):
@@ -66,6 +69,7 @@ class DaySummary(BaseModel):
     available_minutes: int | None = None  # the hours you set for this weekday; None = not set
     unestimated: int = 0  # open items with no time, so they are not in planned_minutes
     overloaded: bool = False  # planned_minutes is more than available_minutes
+    focus_window: str | None = None  # "06:00-09:00": your best focus hours that day, when set
 
 
 class DayPlan(BaseModel):
@@ -106,11 +110,13 @@ class RollOverOut(BaseModel):
 
 class Preferences(BaseModel):
     weekday_minutes: list[int] | None  # Monday..Sunday; None = not set
+    focus_windows: list[str] | None = None  # Monday..Sunday "HH:MM-HH:MM", "" = none that day; None = not set
     rest_days_per_month: int
 
 
 class PreferencesIn(Strict):
     weekday_minutes: list[int] | None = None
+    focus_windows: list[str] | None = None
     rest_days_per_month: int | None = Field(default=None, ge=0, le=31)
 
     @field_validator("weekday_minutes")
@@ -118,4 +124,11 @@ class PreferencesIn(Strict):
     def _week(cls, v):
         if v is not None and (len(v) != 7 or any(not 0 <= m <= 1440 for m in v)):
             raise ValueError("Give 7 values (Monday to Sunday), each between 0 and 1440 minutes")
+        return v
+
+    @field_validator("focus_windows")
+    @classmethod
+    def _windows(cls, v):
+        if v is not None and (len(v) != 7 or any(w and not focus.valid_window(w) for w in v)):
+            raise ValueError("Give 7 values (Monday to Sunday), each empty or like 06:00-09:00 with the end after the start")
         return v

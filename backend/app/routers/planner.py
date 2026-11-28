@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.schemas import planner as s
+from app.services import focus
 from app.services import planner as svc
 from app.services import prefs
 
@@ -68,7 +69,7 @@ def roll_over(body: s.RollOverIn, user: CurrentUser, db: DbSession):
 
 
 def _prefs_out(db, user) -> dict:
-    return {"weekday_minutes": prefs.weekday_minutes(db, user), "rest_days_per_month": prefs.settings_row(db, user).rest_days_per_month}
+    return {"weekday_minutes": prefs.weekday_minutes(db, user), "focus_windows": prefs.focus_windows(db, user), "rest_days_per_month": prefs.settings_row(db, user).rest_days_per_month}
 
 
 @router.get("/preferences", response_model=s.Preferences)
@@ -84,6 +85,8 @@ def update_preferences(body: s.PreferencesIn, user: CurrentUser, db: DbSession):
     data = body.model_dump(exclude_unset=True)
     if "weekday_minutes" in data:
         row.weekday_minutes = prefs.encode(data["weekday_minutes"])
+    if "focus_windows" in data:
+        row.focus_windows = focus.encode(data["focus_windows"])
     if data.get("rest_days_per_month") is not None:
         row.rest_days_per_month = data["rest_days_per_month"]
     db.commit()

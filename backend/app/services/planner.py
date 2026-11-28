@@ -31,7 +31,7 @@ from app.models import (
 from app.schemas import habits as hs
 from app.schemas import planner as s
 from app.schemas import tasks as ts
-from app.services import courses, habits, prefs, rest, roadmap, tasks, videos
+from app.services import courses, focus, habits, prefs, rest, roadmap, tasks, videos
 
 
 class NotFound(Exception):
@@ -60,7 +60,7 @@ def _item(kind: str, ref_id: int, title: str, status: str, link: str, *, subtitl
     return {"key": f"{kind}:{ref_id}", "kind": kind, "ref_id": ref_id, "title": title, "subtitle": subtitle, "status": status,
             "due_date": due_date, "minutes": minutes, "excuse_reason": None, "can_complete": can_complete,
             "can_reschedule": can_reschedule, "can_excuse": False, "link": link, "url": url,
-            "carry_count": carry_count, "slipping": carry_count >= SLIP_AT}
+            "carry_count": carry_count, "slipping": carry_count >= SLIP_AT, "difficulty": None, "hint": None}
 
 
 # ============================== building the day ==============================
@@ -141,7 +141,7 @@ def _topics(db: Session, user: User, day: date, today: date, start: datetime, en
     q = select(RoadmapTopic, RoadmapStage.title).join(RoadmapStage, RoadmapStage.id == RoadmapTopic.stage_id).where(RoadmapTopic.user_id == user.id)
     for t, stage in db.execute(q.where(RoadmapTopic.completed_at >= start, RoadmapTopic.completed_at < end).order_by(RoadmapTopic.completed_at)):
         seen.add(t.id)
-        out.append(_item("topic", t.id, t.title, "completed", "/roadmap", subtitle=stage))
+        out.append({**_item("topic", t.id, t.title, "completed", "/roadmap", subtitle=stage), "difficulty": t.difficulty})
     if day == today:
         open_q = q.where(RoadmapTopic.status != "completed").order_by(RoadmapStage.position, RoadmapTopic.position, RoadmapTopic.id)
         rows = list(db.execute(open_q))
@@ -151,7 +151,8 @@ def _topics(db: Session, user: User, day: date, today: date, start: datetime, en
         for t, stage in picks:
             if t.id not in seen:
                 seen.add(t.id)
-                out.append(_item("topic", t.id, t.title, "pending", "/roadmap", subtitle=f"{stage} · {'in progress' if t.status == 'in_progress' else 'next up'}"))
+                out.append({**_item("topic", t.id, t.title, "pending", "/roadmap", subtitle=f"{stage} · {'in progress' if t.status == 'in_progress' else 'next up'}"),
+                            "difficulty": t.difficulty})
     return out
 
 
@@ -228,6 +229,11 @@ def build_day(db: Session, user: User, day: date, now: datetime | None = None) -
             it["can_excuse"] = False
     items.sort(key=lambda i: (STATUS_ORDER[i["status"]], KIND_ORDER[i["kind"]]))
 
+    windows = prefs.focus_windows(db, user)
+    window = (windows[day.weekday()] or None) if windows else None
+    for it in items:
+        it["hint"] = focus.hint(it["kind"], it["difficulty"], it["status"], window, windows is not None)
+
     counted = [i for i in items if i["status"] != "excused"]
     done = sum(i["status"] == "completed" for i in counted)
     study = db.scalar(select(func.coalesce(func.sum(LearningSession.minutes), 0)).where(LearningSession.user_id == user.id, LearningSession.date == day)) or 0
@@ -238,7 +244,7 @@ def build_day(db: Session, user: User, day: date, now: datetime | None = None) -
         "percent": (100 * done) // len(counted) if counted else 0, "study_minutes": int(study), "dev_minutes": int(dev),
         "by_kind": [{"kind": k, "total": sum(i["kind"] == k for i in counted), "completed": sum(i["kind"] == k and i["status"] == "completed" for i in counted)}
                     for k in KIND_ORDER if any(i["kind"] == k for i in counted)],
-        **_load(db, user, day, counted, rest_day),
+        **_load(db, user, day, counted, rest_day), "focus_window": window,
     }
     return {"date": day, "is_today": day == today, "items": items, "summary": summary}
 
