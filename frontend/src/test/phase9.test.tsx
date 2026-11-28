@@ -180,7 +180,7 @@ describe("planning settings", () => {
     await userEvent.type(rest, "6");
     await userEvent.click(within(card).getByRole("button", { name: "Save planning settings" }));
     expect(await within(card).findByText("Saved")).toBeInTheDocument();
-    expect(fake.planning.prefs).toEqual({ weekday_minutes: [240, 240, 240, 240, 240, 90, 240], rest_days_per_month: 6 });
+    expect(fake.planning.prefs).toEqual({ weekday_minutes: [240, 240, 240, 240, 240, 90, 240], focus_windows: null, rest_days_per_month: 6 });
   });
 
   it("turning the warning off saves no hours", async () => {

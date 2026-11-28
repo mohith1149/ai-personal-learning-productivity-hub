@@ -13,7 +13,7 @@ export function mkItem(o: Partial<PlanItem> & { kind: Kind }): PlanItem {
   const canAct = o.status !== "excused";
   return {
     key: `${o.kind}:${ref}`, ref_id: ref, title: `${o.kind} ${ref}`, subtitle: null, status: "pending", due_date: null, minutes: null, excuse_reason: null,
-    can_complete: o.kind !== "project", can_reschedule: o.kind === "task", can_excuse: canAct, link: `/${o.kind}s`, url: null, carry_count: 0, slipping: (o.carry_count ?? 0) >= 3, ...o,
+    can_complete: o.kind !== "project", can_reschedule: o.kind === "task", can_excuse: canAct, link: `/${o.kind}s`, url: null, carry_count: 0, slipping: (o.carry_count ?? 0) >= 3, difficulty: null, hint: null, ...o,
   };
 }
 
@@ -49,7 +49,7 @@ export function installFakePlanner(fake: Fake, seed: FakePlanner = { days: {} })
     const available = week ? week[weekday] : null;
     const planned = counted.reduce((n, i) => n + (i.minutes ?? 0), 0);
     return {
-      rest_day: restDay, planned_minutes: planned, available_minutes: available,
+      focus_window: null as string | null, rest_day: restDay, planned_minutes: planned, available_minutes: available,
       unestimated: counted.filter((i) => i.minutes === null && i.status !== "completed").length, overloaded: !restDay && available !== null && planned > available,
     };
   };

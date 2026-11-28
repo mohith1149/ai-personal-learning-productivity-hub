@@ -85,7 +85,7 @@ describe("roadmap page", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     const row = await rowOf("PyTorch");
     await waitFor(() => expect(within(row).getByText(/1h 35m over 1 day/)).toBeInTheDocument());
-    expect(within(row).getByRole("combobox")).toHaveValue("in_progress");
+    expect(within(row).getByRole("combobox", { name: /^Status of / })).toHaveValue("in_progress");
     expect(screen.getByRole("region", { name: "Overall roadmap progress" })).toHaveTextContent("1h 35m");
   });
 
@@ -120,7 +120,7 @@ describe("roadmap page", () => {
     expect(await within(await stage(2)).findByText("JAX")).toBeInTheDocument();
     expect(fake.callsTo("POST", /roadmap\/topics$/).at(-1)!.body).toEqual({ stage_id: 2, title: "JAX" });
     expect(within(await stage(2)).getByText(/0 of 3 completed/)).toBeInTheDocument();       // total grew
-    expect(within(await rowOf("JAX")).getByRole("combobox")).toHaveValue("not_started");    // new topics start not started
+    expect(within(await rowOf("JAX")).getByRole("combobox", { name: /^Status of / })).toHaveValue("not_started");    // new topics start not started
   });
 
   it("saves notes and shows them on the topic", async () => {

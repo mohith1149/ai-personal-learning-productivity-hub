@@ -10,7 +10,7 @@ let nextId = 7000;
 export function mkTopic(o: Partial<Topic> & { stage_id: number }): Topic {
   const n = o.id ?? nextId++;
   return {
-    id: n, title: `Topic ${n}`, description: null, position: n, status: "not_started", notes: null, minutes_spent: 0, study_days: 0,
+    id: n, title: `Topic ${n}`, description: null, position: n, status: "not_started", difficulty: "normal", notes: null, minutes_spent: 0, study_days: 0,
     last_studied_on: null, completed_at: null, ...o,
   };
 }

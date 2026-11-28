@@ -3,7 +3,7 @@
 > Living document. Updated at the end of every phase. Source of truth for architecture,
 > schema, endpoints, progress and known issues.
 
-Last updated: 2026-11-25 — Phases 4 to 11 complete. Phase 11 added a private share page and containers. Phase 10 added goals with a pace warning and a timer that logs time. (Phase 9: rest days, daily hours with overload flag, roll-over, slipping tasks.)
+Last updated: 2026-11-28 — Phases 4 to 12 complete. Phase 12 added hard/light topics and focus hours per weekday. Phase 11 added a private share page and containers. Phase 10 added goals with a pace warning and a timer that logs time. (Phase 9: rest days, daily hours with overload flag, roll-over, slipping tasks.)
 ---
 
 ## 1. Purpose
@@ -692,7 +692,7 @@ Reviewer items 4 and 7. Phase 11 (shareable progress page and weekly e-mail, con
 
 ## Phase 11: share page, portfolio and containers
 
-Reviewer items 1, 3 and 5 (item 8, peak focus hours, is still open: it needs a way to mark topics hard or light and your best hours).
+Reviewer items 1, 3 and 5 (item 8, peak focus hours, was done in Phase 12).
 
 - **Share link** (`user_settings.share_token`, `routers/share.py`): `GET/POST/DELETE /api/share` (login) turn sharing on, replace the link or turn it
   off; a new token kills the old link at once. The public page is `GET /share/<token>` (outside `/api`, plain HTML from `services/portfolio.py`; no
@@ -706,3 +706,19 @@ Reviewer items 1, 3 and 5 (item 8, peak focus hours, is still open: it needs a w
   overrides for the database path and public URL). **Not built or run on the author's machine: no `docker` command was available while writing it.**
 - Vite dev proxy forwards `/share` too. Migration `dcf3313dd4c4` adds `user_settings.share_token` (unique). Tests: `tests/test_phase11.py` (16),
   `src/test/phase11.test.tsx` (6).
+
+## Phase 12: hard topics in your best hours, light ones for walks
+
+Reviewer item 8. The choices made with the owner: topics are marked by a tag on each roadmap topic, and focus hours differ per weekday.
+
+- **Difficulty** (`roadmap_topics.difficulty`: `hard | normal | light`, default `normal`, CHECK-constrained). Set from a menu on each roadmap topic
+  (`PATCH /api/roadmap/topics/{id}`, also accepted when creating a topic). Shown on the planner item as `difficulty`.
+- **Focus hours** (`user_settings.focus_windows`: 7 comma-separated `HH:MM-HH:MM` windows Monday..Sunday, empty = none that day; `None` = not set).
+  Read and written through `GET/PATCH /api/planner/preferences` (`focus_windows`, validated: 7 values, end after start). Settings → Planning has a
+  start and end time per weekday. A stored value that is damaged reads as "not set" instead of failing.
+- **Hints** (`services/focus.py`, used by `build_day`): every OPEN planner item gets a one-line `hint`. A hard topic says to do it in today's focus window
+  (or that none is set for that day / that you should set your hours). A light topic and every video say they are fine for a walk, the evening or spare
+  time. Tasks, habits, lessons and projects get none; finished and excused items (including on a rest day) get none. `summary.focus_window` carries the
+  day's window. **The planner only advises; it never moves or schedules anything**, and the assistant's `get_plan` returns the hints too.
+- Migration `0af6ec2f86f2` adds both columns (tried up, down and up on a copy of the real database). Tests: `tests/test_phase12.py` (48),
+  `src/test/phase12.test.tsx` (14). Two older tests were adjusted for the new fields (the exact preferences shape, and roadmap rows now have two menus).

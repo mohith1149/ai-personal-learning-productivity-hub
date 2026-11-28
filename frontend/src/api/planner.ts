@@ -21,6 +21,8 @@ export type PlanItem = {
   url: string | null;
   carry_count: number; // times the task was moved to another day
   slipping: boolean; // moved 3 or more times and still open
+  difficulty: "hard" | "normal" | "light" | null; // roadmap topics only
+  hint: string | null; // where it fits in your day (focus hours, or a light moment), for open items
 };
 
 export type DaySummary = {
@@ -38,6 +40,7 @@ export type DaySummary = {
   available_minutes: number | null; // the hours set for this weekday, null = not set
   unestimated: number;
   overloaded: boolean;
+  focus_window: string | null; // "06:00-09:00": your best focus hours that day, when set
 };
 
 export type DayPlan = { date: string; is_today: boolean; items: PlanItem[]; summary: DaySummary };
@@ -70,7 +73,7 @@ export const useReschedule = () =>
 // ---------------------------------------------------------------- rest days, daily hours, rolling over
 
 export type RestMonth = { month: string; cap: number; used: number; left: number; days: { date: string; reason: string | null }[] };
-export type Preferences = { weekday_minutes: number[] | null; rest_days_per_month: number };
+export type Preferences = { weekday_minutes: number[] | null; focus_windows: string[] | null; rest_days_per_month: number };
 export type MovedTask = { task_id: number; title: string; carry_count: number; minutes: number | null; slipping: boolean };
 export type RollOver = {
   dry_run: boolean;

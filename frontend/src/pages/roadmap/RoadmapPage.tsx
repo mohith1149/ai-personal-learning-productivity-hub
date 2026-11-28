@@ -2,6 +2,7 @@ import { Map as MapIcon, NotebookPen, Plus, Timer, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useAuthStatus } from "../../api/auth";
 import {
+  DIFFICULTY_LABEL,
   TOPIC_STATUS_LABEL,
   useAddTopic,
   useDeleteStudy,
@@ -12,6 +13,7 @@ import {
   useStudy,
   useUpdateTopic,
   type Stage,
+  type Difficulty,
   type Topic,
   type TopicStatus,
 } from "../../api/roadmap";
@@ -22,6 +24,7 @@ import { Button, Card, ErrorNotice, PageHeader, ProgressBar, Spinner, cx } from 
 import { formatDay, todayIn } from "../../lib/dates";
 
 const STATUSES: TopicStatus[] = ["not_started", "in_progress", "completed"];
+const DIFFICULTIES: Difficulty[] = ["hard", "normal", "light"];
 
 /** 95 -> "1h 35m", 40 -> "40m", 0 -> "0m" */
 export function formatMinutes(m: number): string {
@@ -166,6 +169,7 @@ function AddTopicModal({ stage, onClose }: { stage: Stage; onClose: () => void }
 
 function TopicRow({ topic, today, timeZone }: { topic: Topic; today: string; timeZone: string }) {
   const setStatus = useSetTopicStatus();
+  const setDifficulty = useUpdateTopic();
   const del = useDeleteTopic();
   const [study, setStudy] = useState(false);
   const [notes, setNotes] = useState(false);
@@ -198,6 +202,20 @@ function TopicRow({ topic, today, timeZone }: { topic: Topic; today: string; tim
             </option>
           ))}
         </select>
+        <select
+          aria-label={`Difficulty of ${topic.title}`}
+          title="Hard topics are planned for your best focus hours; light ones suit a walk or the evening"
+          value={topic.difficulty}
+          disabled={setDifficulty.isPending}
+          onChange={(e) => setDifficulty.mutate({ id: topic.id, body: { difficulty: e.target.value as Difficulty } })}
+          className={cx("w-24 py-1 text-xs", controlClass)}
+        >
+          {DIFFICULTIES.map((d) => (
+            <option key={d} value={d}>
+              {DIFFICULTY_LABEL[d]}
+            </option>
+          ))}
+        </select>
         <div className="flex items-center">
           {!done && <StartTimerButton kind="topic" id={topic.id} label={topic.title} className="py-1" />}
           <button onClick={() => setStudy(true)} aria-label={`Log study time for ${topic.title}`} title="Log study time" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800">
@@ -211,6 +229,11 @@ function TopicRow({ topic, today, timeZone }: { topic: Topic; today: string; tim
           </button>
         </div>
       </div>
+      {setDifficulty.error && (
+        <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
+          {setDifficulty.error.message}
+        </p>
+      )}
       {setStatus.error && (
         <p role="alert" className="mt-1 text-sm text-red-600 dark:text-red-400">
           {setStatus.error.message}
